@@ -1,0 +1,12 @@
+[package]
+name = "nom-ccsds"
+version = "0.1.0"
+authors = ["nsmryan <nsmryan@gmail.com>"]
+readme="README.markdown"
+keywords=["nom", "parser", "ccsds"]
+categories=["parsing", "protocols"]
+licsense="BSD2"
+
+[dependencies]
+nom="^3.2"
+
