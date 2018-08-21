@@ -1,0 +1,9 @@
+# nom-ccsds
+This repo contains what I hope will become a Rust crate
+for parsing CCSDS packet headers.
+
+
+CCSDS is a packet definition used in space systems, such as the
+International Space Station. It is very simple, and expects
+the user to extend it with additional information in most
+applications.
