@@ -1,34 +1,48 @@
-#[macro_use]
 pub mod types;
 use types::*;
-use nom::*;
 
-extern crate nom;
+use std::mem;
+use std::io::Cursor;
 
-named!(ccsds_first_word<(u8, u8, u8, u16)>,
-       bits!(tuple!(take_bits!(u8,   3),     // version
-                    take_bits!(u8,   1),     // packet type
-                    take_bits!(u8,   1),     // secondary header
-                    take_bits!(u16, 11)))); // apid 
+extern crate bytes;
+use bytes::{Bytes, BytesMut, BufMut, Buf};
 
-named!(ccsds_seq_word<(u8, u16)>,
-       bits!(tuple!(take_bits!(u8, 2), take_bits!(u16, 14))));
 
-named!(ccsds_length_field<u16>, call!(be_u16));
+impl From<Bytes> for PrimaryHeader {
+    fn from(bytes : Bytes) -> PrimaryHeader {
+        let mut buf = Cursor::new(bytes);
 
-named!(primary_header<PrimaryHeader>,
-       do_parse!(
-         first_word : ccsds_first_word >>
-         seq_word : ccsds_seq_word     >>
-         len : ccsds_length_field      >>
+        let first_word  : u16 = buf.get_u16_be();
+        let second_word : u16 = buf.get_u16_be();
+        let len         : u16 = buf.get_u16_be();
 
-         (PrimaryHeader
-           { version : first_word.0
-           , packet_type : PacketType::from(first_word.1)
-           , sec_header_flag : SecondaryHeaderFlag::from(first_word.2)
-           , apid : first_word.3
-           , seq_flag : SeqFlag::from(seq_word.0)
-           , seq : seq_word.1
-           , len : len 
-           })));
+        PrimaryHeader {
+          version : 0,
+          packet_type : PacketType::Command,
+          sec_header_flag : SecondaryHeaderFlag::Present,
+          apid : 0,
+          seq_flag : SeqFlag::Unsegmented,
+          seq : 0,
+          len : 0
+        }
+    }
+}
+
+impl From<PrimaryHeader> for Bytes {
+    fn from(pri_header : PrimaryHeader) -> Bytes {
+        let mut buf = BytesMut::with_capacity(mem::size_of::<PrimaryHeader>());
+
+        buf.put_u16_be((u16::from(u8::from(pri_header.version))         << 13) | 
+                       (u16::from(u8::from(pri_header.packet_type))     << 12) |
+                       (u16::from(u8::from(pri_header.sec_header_flag)) << 11) |
+                       (pri_header.apid));
+
+        buf.put_u16_be((u16::from(pri_header.seq_flag)        << 14) | 
+                       (pri_header.seq));
+
+        buf.put_u16_be(pri_header.len);
+
+        Bytes::from(buf)
+    }
+}
 

@@ -1,13 +1,15 @@
-use std::mem;
-
 
 #[allow(dead_code)]
 const CCSDS_VERSION : u8 = 0;
 
+// TODO Should use mem::size_of when it is in stable
 #[allow(dead_code)]
-const CCSDS_MIN_LENGTH : usize = mem::size_of::<PrimaryHeader>() + 1;
+const CCSDS_MIN_LENGTH : usize = 7; // mem::size_of::<PrimaryHeader>() + 1;
 
-#[derive(Debug, PartialEq)]
+#[allow(dead_code)]
+const CCSDS_PRI_HEADER_SIZE_BYTES : usize = 6;
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum PacketType {
   Data,
   Command,
@@ -24,7 +26,17 @@ impl From<u8> for PacketType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+impl From<PacketType> for u8 {
+    fn from(packet_type : PacketType) -> u8 {
+        match packet_type { 
+            PacketType::Data    => 0,
+            PacketType::Command => 1,
+            PacketType::Unknown => 0,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum SecondaryHeaderFlag {
   NotPresent,
   Present,
@@ -41,8 +53,18 @@ impl From<u8> for SecondaryHeaderFlag {
     }
 }
 
+impl From<SecondaryHeaderFlag> for u8 {
+    fn from(flag : SecondaryHeaderFlag) -> u8 {
+        match flag {
+            SecondaryHeaderFlag::NotPresent => 0,
+            SecondaryHeaderFlag::Present    => 1,
+            SecondaryHeaderFlag::Unknown    => 0
+        }
+    }
+}
 
-#[derive(Debug, PartialEq)]
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum SeqFlag {
   Continuation,
   FirstSegment,
@@ -63,7 +85,19 @@ impl From<u8> for SeqFlag {
     }
 }
 
-#[derive(Debug, PartialEq)]
+impl From<SeqFlag> for u16 {
+    fn from(byte : SeqFlag) -> u16 {
+        match byte {
+            SeqFlag::Continuation => 0,
+            SeqFlag::FirstSegment => 1,
+            SeqFlag::LastSegment  => 2,
+            SeqFlag::Unsegmented  => 3,
+            SeqFlag::Unknown      => 0
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct PrimaryHeader {
   pub version : u8,
   pub packet_type : PacketType,
