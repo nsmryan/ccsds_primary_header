@@ -46,3 +46,25 @@ impl From<PrimaryHeader> for Bytes {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+
+    #[test]
+    fn test_encode() {
+        let pri = PrimaryHeader {
+                    version : 0,
+                    packet_type : PacketType::Command,
+                    sec_header_flag : SecondaryHeaderFlag::Present,
+                    apid : 0,
+                    seq_flag : SeqFlag::Unsegmented,
+                    seq : 0,
+                    len : 0
+                   };
+        let bytes = [u8]::from(Bytes::from(pri));
+        println!("{} {} {} {}", bytes[0], bytes[1], bytes[2], bytes[3]);
+
+    }
+}
+
