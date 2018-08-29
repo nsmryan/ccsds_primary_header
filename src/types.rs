@@ -1,3 +1,17 @@
+#[cfg(test)]
+extern crate quickcheck;
+
+#[cfg(test)]
+use quickcheck::*;
+
+#[cfg(test)]
+extern crate rand;
+
+#[cfg(test)]
+use self::rand::{Rand};
+
+#[cfg(test)]
+use self::rand::seq::{sample_iter};
 
 #[allow(dead_code)]
 const CCSDS_VERSION : u8 = 0;
@@ -15,6 +29,20 @@ pub enum PacketType {
   Command,
   Unknown
 } 
+
+#[cfg(test)]
+impl Rand for PacketType {
+    fn rand<R: Rng>(rng : &mut R) -> Self {
+        use PacketType::*;
+        *sample_iter(rng, [Data, Command].iter(), 1).unwrap()[0]
+    }
+}
+
+impl Default for PacketType {
+    fn default() -> PacketType {
+        PacketType::Data
+    }
+}
 
 impl From<u8> for PacketType {
     fn from(byte : u8) -> PacketType {
@@ -42,6 +70,20 @@ pub enum SecondaryHeaderFlag {
   Present,
   Unknown
 } 
+
+#[cfg(test)]
+impl Rand for SecondaryHeaderFlag {
+    fn rand<R: Rng>(rng : &mut R) -> Self {
+        use SecondaryHeaderFlag::*;
+        *sample_iter(rng, [NotPresent, Present].iter(), 1).unwrap()[0]
+    }
+}
+
+impl Default for SecondaryHeaderFlag {
+    fn default() -> SecondaryHeaderFlag {
+        SecondaryHeaderFlag::NotPresent
+    }
+}
 
 impl From<u8> for SecondaryHeaderFlag {
     fn from(byte : u8) -> SecondaryHeaderFlag {
@@ -73,6 +115,20 @@ pub enum SeqFlag {
   Unknown
 }
 
+#[cfg(test)]
+impl Rand for SeqFlag {
+    fn rand<R: Rng>(rng : &mut R) -> Self {
+        use SeqFlag::*;
+        *sample_iter(rng, [Continuation, FirstSegment, LastSegment, Unsegmented].iter(), 1).unwrap()[0]
+    }
+}
+
+impl Default for SeqFlag {
+    fn default() -> SeqFlag {
+        SeqFlag::Unsegmented
+    }
+}
+
 impl From<u8> for SeqFlag {
     fn from(byte : u8) -> SeqFlag {
         match byte {
@@ -97,7 +153,7 @@ impl From<SeqFlag> for u16 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Default)]
 pub struct PrimaryHeader {
   pub version : u8,
   pub packet_type : PacketType,
@@ -108,3 +164,17 @@ pub struct PrimaryHeader {
   pub len : u16
 }
 
+#[cfg(test)]
+impl Arbitrary for PrimaryHeader {
+    fn arbitrary<G : Gen>(g : &mut G) -> Self {
+        PrimaryHeader {
+            version : g.gen_range(0, 0x8),
+            packet_type : g.gen(),
+            sec_header_flag : g.gen(),
+            apid : g.gen_range(0, 0x800),
+            seq_flag : g.gen(),
+            seq : g.gen_range(0, 0x4000),
+            len : g.gen()
+        }
+    }
+}

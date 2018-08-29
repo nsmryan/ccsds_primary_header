@@ -7,7 +7,25 @@ use std::io::Cursor;
 extern crate bytes;
 use bytes::{Bytes, BytesMut, BufMut, Buf};
 
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
 
+#[cfg(test)]
+use quickcheck::{quickcheck, TestResult};
+
+
+/// This module contains definitions for serializing and deserializing
+/// CCSDS primary headers.
+/// 
+/// The bytes crate is used to read and write the header elements in big-endian
+/// byte order.
+/// 
+/// 
+/// These definitions could be used to parse primary headers, and to 
+/// lay down an header for transfer over a network or into a file.
+
+/// Translate bytes into a Primary Header according to the CCSDS definition.
 impl From<Bytes> for PrimaryHeader {
     fn from(bytes : Bytes) -> PrimaryHeader {
         let mut buf = Cursor::new(bytes);
@@ -17,17 +35,18 @@ impl From<Bytes> for PrimaryHeader {
         let len         : u16 = buf.get_u16_be();
 
         PrimaryHeader {
-          version : 0,
-          packet_type : PacketType::Command,
-          sec_header_flag : SecondaryHeaderFlag::Present,
-          apid : 0,
-          seq_flag : SeqFlag::Unsegmented,
-          seq : 0,
-          len : 0
+          version : ((first_word & 0xE000) >> 13) as u8,
+          packet_type : PacketType::from(((first_word & 0x1000) >> 12) as u8),
+          sec_header_flag : SecondaryHeaderFlag::from(((first_word & 0x0800) >> 11) as u8),
+          apid : first_word & 0x07FF,
+          seq_flag : SeqFlag::from(((second_word & 0xC000) >> 14) as u8),
+          seq : second_word & 0x3FFF,
+          len : len
         }
     }
 }
 
+/// Translate a Primary Header into bytes according to the CCSDS definition.
 impl From<PrimaryHeader> for Bytes {
     fn from(pri_header : PrimaryHeader) -> Bytes {
         let mut buf = BytesMut::with_capacity(mem::size_of::<PrimaryHeader>());
@@ -51,20 +70,25 @@ mod tests {
     use super::*;
 
 
-    #[test]
-    fn test_encode() {
-        let pri = PrimaryHeader {
-                    version : 0,
-                    packet_type : PacketType::Command,
-                    sec_header_flag : SecondaryHeaderFlag::Present,
-                    apid : 0,
-                    seq_flag : SeqFlag::Unsegmented,
-                    seq : 0,
-                    len : 0
-                   };
-        let bytes = [u8]::from(Bytes::from(pri));
-        println!("{} {} {} {}", bytes[0], bytes[1], bytes[2], bytes[3]);
+    /// Test the round trip property going from a header to bytes and back
+    quickcheck! {
+        fn prop_roundtrip(pri_header : PrimaryHeader) -> bool {
+            println!("{:?}", pri_header);
+            println!("{:?}", Bytes::from(pri_header));
+            println!("{:?}", PrimaryHeader::from(Bytes::from(pri_header)));
+            pri_header == PrimaryHeader::from(Bytes::from(pri_header))
+        }
 
+        fn prop_roundtrip_rev(raw_bytes : Vec<u8>) -> TestResult {
+
+            if raw_bytes.len() > 6 {
+                return TestResult::discard()
+            }
+            else {
+                let bytes = Bytes::from(raw_bytes);
+                TestResult::from_bool(bytes == Bytes::from(PrimaryHeader::from(bytes.clone())))
+            }
+        }
     }
 }
 
