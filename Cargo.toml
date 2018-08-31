@@ -5,10 +5,11 @@ authors = ["nsmryan <nsmryan@gmail.com>"]
 readme="README.markdown"
 keywords=["serde", "bytse", "parser", "ccsds"]
 categories=["parsing", "protocols"]
-licsense="BSD2"
+liscense="BSD2"
 
 [dependencies]
 bytes="0.4.9"
+bitfield="0.13.0"
 
 [dev-dependencies]
 quickcheck = "0.6"

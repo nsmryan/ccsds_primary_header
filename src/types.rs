@@ -1,3 +1,7 @@
+extern crate bitfield;
+
+use self::bitfield::{*};
+
 #[cfg(test)]
 extern crate quickcheck;
 
@@ -175,6 +179,58 @@ impl Arbitrary for PrimaryHeader {
             seq_flag : g.gen(),
             seq : g.gen_range(0, 0x4000),
             len : g.gen()
+        }
+    }
+}
+
+/* Primary Header with BitFields */
+bitfield!{
+    #[derive(Clone)]
+    pub struct PacketWord(MSB0 [u8]);
+    pub u16, version, set_version: 15, 13;
+    pub u16, into PacketType, packet_type, set_packet_type: 12;
+    pub u16, into SecondaryHeaderFlag, secondary_header_flag, set_secondary_header_flag: 11;
+    pub u16, apid, set_apid: 10, 0;
+}
+
+#[cfg(test)]
+impl Arbitrary for PacketWord {
+    fn arbitrary<G : Gen>(g : &mut G) -> Self {
+        let byte0 = g.gen();
+        let byte1 = g.gen();
+        PacketWord( byte0, byte1 )
+    }
+}
+
+bitfield!{
+    #[derive(Clone)]
+    pub struct SequenceWord(u16);
+    pub u8, into SeqFlag, sequence_type, get_sequence_type: 15, 14;
+    pub u16, sequence_count, get_sequence_count: 13, 0;
+}
+#[cfg(test)]
+impl Arbitrary for SequenceWord {
+    fn arbitrary<G : Gen>(g : &mut G) -> Self {
+        let sequence_word = g.gen();
+        SequenceWord(sequence_word)
+    }
+}
+
+#[repr(C)]
+#[derive(Clone)]
+pub struct PrimaryHeaderRaw {
+    pub control : PacketWord,
+    pub sequence : SequenceWord,
+    pub length : u16
+}
+
+#[cfg(test)]
+impl Arbitrary for PrimaryHeaderRaw {
+    fn arbitrary<G : Gen>(g : &mut G) -> Self {
+        PrimaryHeaderRaw {
+            control  : PacketWord(g.gen::<u16>()),
+            sequence : SequenceWord(g.gen::<u16>()),
+            length   : g.gen()
         }
     }
 }

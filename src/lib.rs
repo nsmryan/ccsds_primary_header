@@ -73,22 +73,29 @@ mod tests {
     /// Test the round trip property going from a header to bytes and back
     quickcheck! {
         fn prop_roundtrip(pri_header : PrimaryHeader) -> bool {
-            println!("{:?}", pri_header);
-            println!("{:?}", Bytes::from(pri_header));
-            println!("{:?}", PrimaryHeader::from(Bytes::from(pri_header)));
+            //println!("{:?}", pri_header);
+            //println!("{:?}", Bytes::from(pri_header));
+            //println!("{:?}", PrimaryHeader::from(Bytes::from(pri_header)));
             pri_header == PrimaryHeader::from(Bytes::from(pri_header))
         }
+    }
 
-        fn prop_roundtrip_rev(raw_bytes : Vec<u8>) -> TestResult {
+    #[test]
+    fn ccsds_header_alternating_ones() {
+        let mut bytes : [u8;6] = Default::default();
+        bytes[0] = 0x18;
+        bytes[1] = 37;
+        bytes[2] = 0;
+        bytes[3] = 0;
+        bytes[4] = 0;
+        bytes[5] = 0;
 
-            if raw_bytes.len() > 6 {
-                return TestResult::discard()
-            }
-            else {
-                let bytes = Bytes::from(raw_bytes);
-                TestResult::from_bool(bytes == Bytes::from(PrimaryHeader::from(bytes.clone())))
-            }
+        unsafe {
+            let pri_header = std::mem::transmute::<[u8;6], PrimaryHeaderRaw>(bytes);
+            println!("{:?}", pri_header.control.version());
+            println!("{:?}", pri_header.control.packet_type());
+            println!("{:?}", pri_header.control.secondary_header_flag());
+            println!("{:?}", pri_header.control.apid());
         }
     }
 }
-
