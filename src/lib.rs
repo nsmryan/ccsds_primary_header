@@ -83,10 +83,10 @@ mod tests {
     #[test]
     fn ccsds_header_alternating_ones() {
         let mut bytes : [u8;6] = Default::default();
-        bytes[0] = 0x18;
+        bytes[0] = 0x10;
         bytes[1] = 37;
-        bytes[2] = 0;
-        bytes[3] = 0;
+        bytes[2] = 0x00;
+        bytes[3] = 0x00;
         bytes[4] = 0;
         bytes[5] = 0;
 

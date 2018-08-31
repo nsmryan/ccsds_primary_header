@@ -186,19 +186,18 @@ impl Arbitrary for PrimaryHeader {
 /* Primary Header with BitFields */
 bitfield!{
     #[derive(Clone)]
-    pub struct PacketWord(MSB0 [u8]);
-    pub u16, version, set_version: 15, 13;
-    pub u16, into PacketType, packet_type, set_packet_type: 12;
-    pub u16, into SecondaryHeaderFlag, secondary_header_flag, set_secondary_header_flag: 11;
-    pub u16, apid, set_apid: 10, 0;
+    pub struct PacketWord(u16);
+    pub u16, version, set_version: 2, 0;
+    pub u16, into PacketType, packet_type, set_packet_type: 3;
+    pub u16, into SecondaryHeaderFlag, secondary_header_flag, set_secondary_header_flag: 4;
+    pub u16, apid, set_apid: 15, 8;
 }
 
 #[cfg(test)]
 impl Arbitrary for PacketWord {
     fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        let byte0 = g.gen();
-        let byte1 = g.gen();
-        PacketWord( byte0, byte1 )
+        let control_word = g.gen();
+        PacketWord( control_word )
     }
 }
 
