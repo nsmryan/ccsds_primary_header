@@ -9,7 +9,8 @@ liscense="BSD2"
 
 [dependencies]
 bytes="0.4.9"
-bitfield="0.13.0"
+packed_struct="0.3"
+packed_struct_codegen="0.3"
 
 [dev-dependencies]
 quickcheck = "0.6"
