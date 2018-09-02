@@ -5,6 +5,7 @@ authors = ["nsmryan <nsmryan@gmail.com>"]
 readme="README.md"
 keywords=["serde", "bytse", "parser", "ccsds"]
 categories=["parsing", "network-programming"]
+documentation="https://github.com/nsmryan/ccsds_primary_header"
 license="BSD-3-Clause"
 homepage="https://github.com/nsmryan/ccsds_primary_header"
 description="Implementation of the CCSDS Primary Header for space applications"
