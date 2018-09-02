@@ -40,4 +40,4 @@ a comprehensive set of unit test, but until it is used with
 real CCSDS packets, I do not recommend relying on it.
 
 ## License
-This project is licensed until the BSD2 license.
+This project is licensed until the BSD-3-Clause license.
