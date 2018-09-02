@@ -1,6 +1,6 @@
 extern crate ccsds_primary_header;
 
-use ccsds_primary_header::types::*;
+use ccsds_primary_header::*;
 
 
 fn main() {

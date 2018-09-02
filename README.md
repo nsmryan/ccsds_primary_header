@@ -18,5 +18,26 @@ The PrimaryHeader struct provided by the crate has the
 advantage that its in-memory representation matches the
 CCSDS standard. This way, it can be cast to a from a 
 byte array, sent over a wire, or used to serialize or
-deserialze CCSDS packets.
+deserialize CCSDS packets.
 
+
+## Usage
+To use this crate, add the following to your Cargo.toml
+```toml
+[dependancies]
+ccsds_primary_header="0.1.0"
+```
+
+Next add this to you crate:
+```rust
+extern crate ccsds_primary_header;
+use ccsds_primary_header::*;
+```
+
+## Notes
+This crate has not been used in production code. There is
+a comprehensive set of unit test, but until it is used with
+real CCSDS packets, I do not recommend relying on it.
+
+## License
+This project is licensed until the BSD2 license.
