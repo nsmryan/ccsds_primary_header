@@ -5,11 +5,12 @@ authors = ["nsmryan <nsmryan@gmail.com>"]
 readme="README.markdown"
 keywords=["serde", "bytse", "parser", "ccsds"]
 categories=["parsing", "protocols"]
-liscense="BSD2"
+license="BSD2"
+homepage="https://github.com/nsmryan/ccsds_primary_header"
+description="Implementation of the CCSDS Primary Header for space applications"
 
 [dependencies]
-bytes="0.4.9"
-bitfield="0.13.0"
+byteorder="1.2.6"
 
 [dev-dependencies]
 quickcheck = "0.6"

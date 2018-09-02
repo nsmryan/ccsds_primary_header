@@ -1,11 +1,19 @@
+/*!
+This crate provides an implementation of the CCSDS Primary Header defined in the
+CCSDS Space Packet Protocol standards document.
+
+This packet header is used in space applications, including the International Space
+Station and many cubsat applications, among many other.
+
+The PrimaryHeader struct is defined in such a way that it is laid out in memory
+as defined by the standard, including bitfields and big endian byte order.
+To support this layout the fields are accessed through getters/setters rather
+then through direct access.
+
+Header fields that have enumerations are retrieved as enums.
+*/
 pub mod types;
 use types::*;
-
-use std::mem;
-use std::io::Cursor;
-
-extern crate bytes;
-use bytes::{Bytes, BytesMut, BufMut, Buf};
 
 #[cfg(test)]
 #[macro_use]
@@ -15,87 +23,124 @@ extern crate quickcheck;
 use quickcheck::{quickcheck, TestResult};
 
 
-/// This module contains definitions for serializing and deserializing
-/// CCSDS primary headers.
-/// 
-/// The bytes crate is used to read and write the header elements in big-endian
-/// byte order.
-/// 
-/// 
-/// These definitions could be used to parse primary headers, and to 
-/// lay down an header for transfer over a network or into a file.
-
-/// Translate bytes into a Primary Header according to the CCSDS definition.
-impl From<Bytes> for PrimaryHeader {
-    fn from(bytes : Bytes) -> PrimaryHeader {
-        let mut buf = Cursor::new(bytes);
-
-        let first_word  : u16 = buf.get_u16_be();
-        let second_word : u16 = buf.get_u16_be();
-        let len         : u16 = buf.get_u16_be();
-
-        PrimaryHeader {
-          version : ((first_word & 0xE000) >> 13) as u8,
-          packet_type : PacketType::from(((first_word & 0x1000) >> 12) as u8),
-          sec_header_flag : SecondaryHeaderFlag::from(((first_word & 0x0800) >> 11) as u8),
-          apid : first_word & 0x07FF,
-          seq_flag : SeqFlag::from(((second_word & 0xC000) >> 14) as u8),
-          seq : second_word & 0x3FFF,
-          len : len
-        }
-    }
-}
-
-/// Translate a Primary Header into bytes according to the CCSDS definition.
-impl From<PrimaryHeader> for Bytes {
-    fn from(pri_header : PrimaryHeader) -> Bytes {
-        let mut buf = BytesMut::with_capacity(mem::size_of::<PrimaryHeader>());
-
-        buf.put_u16_be((u16::from(u8::from(pri_header.version))         << 13) | 
-                       (u16::from(u8::from(pri_header.packet_type))     << 12) |
-                       (u16::from(u8::from(pri_header.sec_header_flag)) << 11) |
-                       (pri_header.apid));
-
-        buf.put_u16_be((u16::from(pri_header.seq_flag)        << 14) | 
-                       (pri_header.seq));
-
-        buf.put_u16_be(pri_header.len);
-
-        Bytes::from(buf)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn ccsds_header_alternating_ones() {
+        let mut bytes : [u8;6] = Default::default();
+        bytes[0] = 0x17;
+        bytes[1] = 0xFF;
+        bytes[2] = 0x3F;
+        bytes[3] = 0xFF;
+        bytes[4] = 0x00;
+        bytes[5] = 0x00;
 
-    /// Test the round trip property going from a header to bytes and back
-    quickcheck! {
-        fn prop_roundtrip(pri_header : PrimaryHeader) -> bool {
-            //println!("{:?}", pri_header);
-            //println!("{:?}", Bytes::from(pri_header));
-            //println!("{:?}", PrimaryHeader::from(Bytes::from(pri_header)));
-            pri_header == PrimaryHeader::from(Bytes::from(pri_header))
+        unsafe {
+            let pri_header = std::mem::transmute::<[u8;6], PrimaryHeader>(bytes);
+            assert!(pri_header.control.version() == 0);
+            assert!(pri_header.control.packet_type() == PacketType::Command);
+            assert!(pri_header.control.secondary_header_flag() == SecondaryHeaderFlag::NotPresent);
+            assert!(pri_header.control.apid() == 0x07FF);
+
+            assert!(pri_header.sequence.sequence_type() == SeqFlag::Continuation);
+            assert!(pri_header.sequence.sequence_count() == 0x3FFF);
+
+            assert!(pri_header.length.length_field() == 0x0000);
         }
     }
 
     #[test]
-    fn ccsds_header_alternating_ones() {
+    fn ccsds_header_alternating_ones_alt() {
         let mut bytes : [u8;6] = Default::default();
-        bytes[0] = 0x10;
-        bytes[1] = 37;
-        bytes[2] = 0x00;
+        bytes[0] = 0xE8;
+        bytes[1] = 0x00;
+        bytes[2] = 0xC0;
         bytes[3] = 0x00;
-        bytes[4] = 0;
-        bytes[5] = 0;
+        bytes[4] = 0xFF;
+        bytes[5] = 0xFF;
 
         unsafe {
-            let pri_header = std::mem::transmute::<[u8;6], PrimaryHeaderRaw>(bytes);
-            println!("{:?}", pri_header.control.version());
-            println!("{:?}", pri_header.control.packet_type());
-            println!("{:?}", pri_header.control.secondary_header_flag());
-            println!("{:?}", pri_header.control.apid());
+            let pri_header = std::mem::transmute::<[u8;6], PrimaryHeader>(bytes);
+            assert!(pri_header.control.version() == 0x7);
+            assert!(pri_header.control.packet_type() == PacketType::Data);
+            assert!(pri_header.control.secondary_header_flag() == SecondaryHeaderFlag::Present);
+            assert!(pri_header.control.apid() == 0x0000);
+
+            assert!(pri_header.sequence.sequence_type() == SeqFlag::Unsegmented);
+            assert!(pri_header.sequence.sequence_count() == 0x0000);
+
+            assert!(pri_header.length.length_field() == 0xFFFF);
+        }
+    }
+
+    #[test]
+    fn ccsds_header_size() {
+        assert!(std::mem::size_of::<PrimaryHeader>() == CCSDS_PRI_HEADER_SIZE_BYTES as usize);
+    }
+
+    quickcheck! {
+        fn ccsds_version_get_set(version : u16) -> bool {
+            let version = version % 0x7;
+
+            let mut pri_header : PrimaryHeader = Default::default();
+
+            pri_header.control.set_version(version);
+
+            pri_header.control.version() == version
+        }
+
+        fn ccsds_packet_type_get_set(packet_type : PacketType) -> bool {
+            let mut pri_header : PrimaryHeader = Default::default();
+
+            pri_header.control.set_packet_type(packet_type);
+
+            pri_header.control.packet_type() == packet_type
+        }
+
+        fn ccsds_sec_header_flag_get_set(sec_header_flag : SecondaryHeaderFlag) -> bool {
+            let mut pri_header : PrimaryHeader = Default::default();
+
+            pri_header.control.set_secondary_header_flag(sec_header_flag);
+
+            pri_header.control.secondary_header_flag() == sec_header_flag
+        }
+
+        fn ccsds_apid_get_set(apid : u16) -> bool {
+            let apid = apid % 0x7FF;
+
+            let mut pri_header : PrimaryHeader = Default::default();
+
+            pri_header.control.set_apid(apid);
+
+            pri_header.control.apid() == apid
+        }
+
+        fn ccsds_seq_flag_get_set(seq_flag : SeqFlag) -> bool {
+            let mut pri_header : PrimaryHeader = Default::default();
+
+            pri_header.sequence.set_sequence_type(seq_flag);
+
+            pri_header.sequence.sequence_type() == seq_flag
+        }
+
+        fn ccsds_seq_count_get_set(seq_count : u16) -> bool {
+            let seq_count = seq_count % 0x3FFF;
+
+            let mut pri_header : PrimaryHeader = Default::default();
+
+            pri_header.sequence.set_sequence_count(seq_count);
+
+            pri_header.sequence.sequence_count() == seq_count
+        }
+
+        fn ccsds_length_get_set(length : u16) -> bool {
+            let mut pri_header : PrimaryHeader = Default::default();
+
+            pri_header.length.set_length_field(length);
+
+            pri_header.length.length_field() == length
         }
     }
 }

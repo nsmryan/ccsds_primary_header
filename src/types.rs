@@ -1,6 +1,6 @@
-extern crate bitfield;
+extern crate byteorder;
 
-use self::bitfield::{*};
+use self::byteorder::{ByteOrder, BigEndian};
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -18,15 +18,21 @@ use self::rand::{Rand};
 use self::rand::seq::{sample_iter};
 
 #[allow(dead_code)]
-const CCSDS_VERSION : u8 = 0;
+pub const CCSDS_VERSION : u8 = 0;
 
 // TODO Should use mem::size_of when it is in stable
 #[allow(dead_code)]
-const CCSDS_MIN_LENGTH : usize = 7; // mem::size_of::<PrimaryHeader>() + 1;
+pub const CCSDS_MIN_LENGTH : u16 = 7; // mem::size_of::<PrimaryHeader>() + 1;
 
 #[allow(dead_code)]
-const CCSDS_PRI_HEADER_SIZE_BYTES : usize = 6;
+pub const CCSDS_PRI_HEADER_SIZE_BYTES : u16 = 6;
 
+#[allow(dead_code)]
+pub const CCSDS_MIN_PACKET_LENGTH_BYTES : u16 = 1;
+
+
+/// The PacketType indicates whether the packet is a command (Command) or a 
+/// telemetry (Data) packet.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum PacketType {
   Data,
@@ -37,8 +43,16 @@ pub enum PacketType {
 #[cfg(test)]
 impl Rand for PacketType {
     fn rand<R: Rng>(rng : &mut R) -> Self {
-        use PacketType::*;
+        use self::PacketType::*;
         *sample_iter(rng, [Data, Command].iter(), 1).unwrap()[0]
+    }
+}
+
+#[cfg(test)]
+impl Arbitrary for PacketType {
+    fn arbitrary<G : Gen>(g : &mut G) -> Self {
+        let packet_type : u8 = g.gen();
+        PacketType::from(packet_type & 0x01)
     }
 }
 
@@ -68,6 +82,8 @@ impl From<PacketType> for u8 {
     }
 }
 
+/// The secondary header flag indicates whether there is another header
+/// following the primary header (Present) or not (NotPresent).
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum SecondaryHeaderFlag {
   NotPresent,
@@ -80,6 +96,14 @@ impl Rand for SecondaryHeaderFlag {
     fn rand<R: Rng>(rng : &mut R) -> Self {
         use SecondaryHeaderFlag::*;
         *sample_iter(rng, [NotPresent, Present].iter(), 1).unwrap()[0]
+    }
+}
+
+#[cfg(test)]
+impl Arbitrary for SecondaryHeaderFlag {
+    fn arbitrary<G : Gen>(g : &mut G) -> Self {
+        let seq_header_flag : u8 = g.gen();
+        SecondaryHeaderFlag::from(seq_header_flag & 0x01)
     }
 }
 
@@ -110,6 +134,13 @@ impl From<SecondaryHeaderFlag> for u8 {
 }
 
 
+/// The sequence flag indicates the interpretation of the sequence count.
+/// Continuation- the sequence count indicates the block in a series of packets
+///               containing segmented data
+/// FirstSegement- the packet is the first in a series of segemented packets.
+/// LastSegement- the packet is the last in a series of segemented packets.
+/// Unsegmented- the sequence count is an incrementing counter used to distinguish
+///              packets.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum SeqFlag {
   Continuation,
@@ -124,6 +155,14 @@ impl Rand for SeqFlag {
     fn rand<R: Rng>(rng : &mut R) -> Self {
         use SeqFlag::*;
         *sample_iter(rng, [Continuation, FirstSegment, LastSegment, Unsegmented].iter(), 1).unwrap()[0]
+    }
+}
+
+#[cfg(test)]
+impl Arbitrary for SeqFlag {
+    fn arbitrary<G : Gen>(g : &mut G) -> Self {
+        let seq_flag : u8 = g.gen();
+        SeqFlag::from(seq_flag % 0x03)
     }
 }
 
@@ -157,56 +196,86 @@ impl From<SeqFlag> for u16 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Default)]
-pub struct PrimaryHeader {
-  pub version : u8,
-  pub packet_type : PacketType,
-  pub sec_header_flag : SecondaryHeaderFlag,
-  pub apid : u16,
-  pub seq_flag : SeqFlag,
-  pub seq : u16,
-  pub len : u16
-}
+/// The control word is the first word of the primary header.
+#[derive(Debug, Copy, Clone, Default)]
+pub struct ControlWord([u8;2]);
 
-#[cfg(test)]
-impl Arbitrary for PrimaryHeader {
-    fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        PrimaryHeader {
-            version : g.gen_range(0, 0x8),
-            packet_type : g.gen(),
-            sec_header_flag : g.gen(),
-            apid : g.gen_range(0, 0x800),
-            seq_flag : g.gen(),
-            seq : g.gen_range(0, 0x4000),
-            len : g.gen()
-        }
+impl ControlWord {
+    pub fn version(&self) -> u16 {
+        (BigEndian::read_u16(&self.0) & 0xE000) >> 13
+    }
+
+    pub fn set_version(&mut self, version : u16) {
+        let word = (BigEndian::read_u16(&self.0) & 0x1FFF) | (version << 13);
+
+        BigEndian::write_u16(&mut self.0, word);
+    }
+
+    pub fn packet_type(&self) -> PacketType {
+        PacketType::from(((BigEndian::read_u16(&self.0) & 0x1000) >> 12) as u8)
+    }
+    
+    pub fn set_packet_type(&mut self, packet_type : PacketType) {
+        let word = (BigEndian::read_u16(&self.0) & 0xEFFF) | ((packet_type as u16) << 12);
+
+        BigEndian::write_u16(&mut self.0, word);
+    }
+
+    pub fn secondary_header_flag(&self) -> SecondaryHeaderFlag {
+        SecondaryHeaderFlag::from(((BigEndian::read_u16(&self.0) & 0x0800) >> 11) as u8)
+    }
+    
+    pub fn set_secondary_header_flag(&mut self, sec_header_flag : SecondaryHeaderFlag) {
+        let word = (BigEndian::read_u16(&self.0) & 0xF7FF) | ((sec_header_flag as u16) << 11);
+
+        BigEndian::write_u16(&mut self.0, word);
+    }
+
+    pub fn apid(&self) -> u16 {
+        (BigEndian::read_u16(&self.0) & 0x07FF)
+    }
+    
+    pub fn set_apid(&mut self, apid : u16) {
+        let word = (BigEndian::read_u16(&self.0) & 0xF800) | (apid & 0x07FF);
+
+        BigEndian::write_u16(&mut self.0, word);
     }
 }
 
-/* Primary Header with BitFields */
-bitfield!{
-    #[derive(Clone)]
-    pub struct PacketWord(u16);
-    pub u16, version, set_version: 2, 0;
-    pub u16, into PacketType, packet_type, set_packet_type: 3;
-    pub u16, into SecondaryHeaderFlag, secondary_header_flag, set_secondary_header_flag: 4;
-    pub u16, apid, set_apid: 15, 8;
-}
-
 #[cfg(test)]
-impl Arbitrary for PacketWord {
+impl Arbitrary for ControlWord {
     fn arbitrary<G : Gen>(g : &mut G) -> Self {
         let control_word = g.gen();
-        PacketWord( control_word )
+        ControlWord( control_word )
     }
 }
 
-bitfield!{
-    #[derive(Clone)]
-    pub struct SequenceWord(u16);
-    pub u8, into SeqFlag, sequence_type, get_sequence_type: 15, 14;
-    pub u16, sequence_count, get_sequence_count: 13, 0;
+#[derive(Debug, Copy, Clone, Default)]
+pub struct SequenceWord([u8;2]);
+
+/// The sequence word is the second word of the primary header.
+impl SequenceWord {
+    pub fn sequence_type(&self) -> SeqFlag {
+        SeqFlag::from((BigEndian::read_u16(&self.0) >> 14) as u8)
+    }
+    
+    pub fn set_sequence_type(&mut self, seq_flag : SeqFlag) {
+        let word = (BigEndian::read_u16(&self.0) & 0x3FFF) | (u16::from(seq_flag) << 14);
+
+        BigEndian::write_u16(&mut self.0, word);
+    }
+
+    pub fn sequence_count(&self) -> u16 {
+        BigEndian::read_u16(&self.0) & 0x3FFF
+    }
+
+    pub fn set_sequence_count(&mut self, seq_count : u16) {
+        let word = (BigEndian::read_u16(&self.0) & 0xC000) | (seq_count & 0x3FFF);
+
+        BigEndian::write_u16(&mut self.0, word);
+    }
 }
+
 #[cfg(test)]
 impl Arbitrary for SequenceWord {
     fn arbitrary<G : Gen>(g : &mut G) -> Self {
@@ -215,20 +284,63 @@ impl Arbitrary for SequenceWord {
     }
 }
 
-#[repr(C)]
-#[derive(Clone)]
-pub struct PrimaryHeaderRaw {
-    pub control : PacketWord,
-    pub sequence : SequenceWord,
-    pub length : u16
+#[derive(Debug, Copy, Clone, Default)]
+pub struct LengthWord([u8;2]);
+
+/// The sequence word is the third word of the primary header.
+impl LengthWord {
+    pub fn length_field(&self) -> u16 {
+        BigEndian::read_u16(&self.0)
+    }
+
+    pub fn set_length_field(&mut self, length : u16) {
+        BigEndian::write_u16(&mut self.0, length);
+    }
 }
 
 #[cfg(test)]
-impl Arbitrary for PrimaryHeaderRaw {
+impl Rand for LengthWord {
+    fn rand<R: Rng>(rng : &mut R) -> Self {
+        LengthWord(rng.gen())
+    }
+}
+
+#[cfg(test)]
+impl Arbitrary for LengthWord {
     fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        PrimaryHeaderRaw {
-            control  : PacketWord(g.gen::<u16>()),
-            sequence : SequenceWord(g.gen::<u16>()),
+        let len = g.gen();
+        LengthWord(len)
+    }
+}
+
+/// The PrimaryHeader struct represents a CCSDS Primary header.
+/// Its representation in memory matches the CCSDS standard.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PrimaryHeader {
+    pub control  : ControlWord,
+    pub sequence : SequenceWord,
+    pub length   : LengthWord
+}
+
+impl PrimaryHeader {
+    /// Get the length of the packet in bytes, including the primary header.
+    pub fn packet_length(&self) -> u16 {
+        self.length.length_field() + CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_PACKET_LENGTH_BYTES
+    }
+
+    /// Set the length of the packet in bytes, including the primary header.
+    pub fn set_packet_length(&mut self, packet_length : u16) {
+        BigEndian::write_u16(&mut self.length.0, packet_length);
+    }
+}
+
+#[cfg(test)]
+impl Arbitrary for PrimaryHeader {
+    fn arbitrary<G : Gen>(g : &mut G) -> Self {
+        PrimaryHeader {
+            control  : ControlWord(g.gen::<[u8;2]>()),
+            sequence : SequenceWord(g.gen::<[u8;2]>()),
             length   : g.gen()
         }
     }
