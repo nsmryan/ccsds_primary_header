@@ -26,26 +26,34 @@ use self::rand::{Rand};
 
 use self::rand::seq::{sample_iter};
 
+/// The CCSDS Version (always 0 currently).
 #[allow(dead_code)]
 pub const CCSDS_VERSION : u8 = 0;
 
-// TODO Should use mem::size_of when it is in stable
-#[allow(dead_code)]
-pub const CCSDS_MIN_LENGTH : u16 = 7; // mem::size_of::<PrimaryHeader>() + 1;
-
+/// The CCSDS primary header size in bytes.
 #[allow(dead_code)]
 pub const CCSDS_PRI_HEADER_SIZE_BYTES : u16 = 6;
 
+/// The minimum size of a CCSDS packet's data section.
 #[allow(dead_code)]
-pub const CCSDS_MIN_PACKET_LENGTH_BYTES : u16 = 1;
+pub const CCSDS_MIN_DATA_LENGTH_BYTES : u16 = 1;
+
+/// The minimum packet length of a CCSDS packet.
+/// This is the primary header size plus 1 byte.
+#[allow(dead_code)]
+pub const CCSDS_MIN_LENGTH : u16 = CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES; // mem::size_of::<PrimaryHeader>() + 1;
 
 
 /// The PacketType indicates whether the packet is a command (Command) or a 
 /// telemetry (Data) packet.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum PacketType {
+  /// The packet contains telemetry data.
   Data,
+  /// The packet contains a command.
   Command,
+  /// The packet type is unknown. This should not occur, but it is included
+  /// for encoding an integer into a packet type.
   Unknown
 } 
 
@@ -93,8 +101,14 @@ impl From<PacketType> for u8 {
 /// following the primary header (Present) or not (NotPresent).
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum SecondaryHeaderFlag {
+  /// The secondary header is not present. The bytes following the primary header
+  /// is the packet's data section.
   NotPresent,
+  /// A secondary header is present in the packet. The secondary header follows the
+  /// primary header.
   Present,
+  /// The secondary header flag in not valid. This should not occur, but it is included
+  /// for turning an integer into a SecondaryHeaderFlag.
   Unknown
 } 
 
@@ -148,10 +162,16 @@ impl From<SecondaryHeaderFlag> for u8 {
 ///              packets.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum SeqFlag {
+  /// The packets is a continuation in a series of packets.
   Continuation,
+  /// The packets is the first is a series of packets.
   FirstSegment,
+  /// The packets is the last is a series of packets.
   LastSegment,
+  /// The packets is a standalone packet. Most packets are unsegmented.
   Unsegmented,
+  /// The sequence flag is unknown. This should not occur, but it is included
+  /// for encoding integers into this type.
   Unknown
 }
 
@@ -200,6 +220,16 @@ impl From<SeqFlag> for u16 {
 }
 
 /// The control word is the first word of the primary header.
+/// This word contains:
+///
+///
+/// * The packet's CCSDS version
+/// * A flag indicating whether or not there is a
+///   secondary header.
+/// * A flag indicating whether the packet is a command
+///   or telemetry packet
+/// * The packet's APID, indicating the packet's source,
+///   destination, and contents.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct ControlWord([u8;2]);
 
@@ -252,10 +282,12 @@ impl Arbitrary for ControlWord {
     }
 }
 
+/// The sequence word is the second word of the primary header.
+/// It contains a sequence count and an enum that determines how
+/// to interpret the sequence count.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct SequenceWord([u8;2]);
 
-/// The sequence word is the second word of the primary header.
 impl SequenceWord {
     pub fn sequence_type(&self) -> SeqFlag {
         SeqFlag::from((BigEndian::read_u16(&self.0) >> 14) as u8)
@@ -285,6 +317,8 @@ impl Arbitrary for SequenceWord {
     }
 }
 
+/// The length word of the CCSDS header. This is just a u16, but
+/// it is wrapped in a struct for consistency with the other fields.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct LengthWord([u8;2]);
 
@@ -325,7 +359,7 @@ pub struct PrimaryHeader {
 impl PrimaryHeader {
     /// Get the length of the packet in bytes, including the primary header.
     pub fn packet_length(&self) -> u16 {
-        self.length.length_field() + CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_PACKET_LENGTH_BYTES
+        self.length.length_field() + CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES
     }
 
     /// Set the length of the packet in bytes, including the primary header.
