@@ -1,16 +1,16 @@
-# ccsds_primary_header
+# ccsds\_primary\_header
 This crate contains an implementation of the CCSDS standard
 called Space Packet Protocol, which defines a packet header
 called the CCSDS Primary Header.
 
 
 CCSDS is a packet definition used in many space systems, such as the
-International Space Station. It is very simple, and expects
-the user to extend it with additional information in most
-applications. 
+International Space Station and many satellites and cubesats.
+It is very simple, and expects the user to extend it with additional
+information in most applications. 
 
 
-This crate will provide only a simple implementation of the
+This crate provides a simple implementation of the
 primary header. It is intended to be used as a building
 block for larger definitions or packet processing tools.
 
@@ -25,7 +25,7 @@ deserialize CCSDS packets.
 To use this crate, add the following to your Cargo.toml
 ```toml
 [dependancies]
-ccsds_primary_header="0.1.0"
+ccsds_primary_header="0.2.0"
 ```
 
 Next add this to you crate:
