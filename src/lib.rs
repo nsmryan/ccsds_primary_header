@@ -3,7 +3,7 @@ This crate provides an implementation of the CCSDS Primary Header defined in the
 CCSDS Space Packet Protocol standards document.
 
 This packet header is used in space applications, including the International Space
-Station and many cubsat applications, among many other.
+Station and many cubesat applications, among many other.
 
 The PrimaryHeader struct is defined in such a way that it is laid out in memory
 as defined by the standard, including bitfields and big endian byte order.
@@ -11,6 +11,11 @@ To support this layout the fields are accessed through getters/setters rather
 then through direct access.
 
 Header fields that have enumerations are retrieved as enums.
+
+
+The main thing this crate provides is the PrimaryHeader struct. These can be
+created out of sequences of u8s, and by transmuting from raw memory as these structures
+read memory directly in the CCSDS format.
 */
 extern crate byteorder;
 
@@ -221,8 +226,6 @@ impl From<SeqFlag> for u16 {
 
 /// The control word is the first word of the primary header.
 /// This word contains:
-///
-///
 /// * The packet's CCSDS version
 /// * A flag indicating whether or not there is a
 ///   secondary header.
@@ -230,7 +233,7 @@ impl From<SeqFlag> for u16 {
 ///   or telemetry packet
 /// * The packet's APID, indicating the packet's source,
 ///   destination, and contents.
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 pub struct ControlWord([u8;2]);
 
 impl ControlWord {
@@ -285,7 +288,7 @@ impl Arbitrary for ControlWord {
 /// The sequence word is the second word of the primary header.
 /// It contains a sequence count and an enum that determines how
 /// to interpret the sequence count.
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 pub struct SequenceWord([u8;2]);
 
 impl SequenceWord {
@@ -319,7 +322,7 @@ impl Arbitrary for SequenceWord {
 
 /// The length word of the CCSDS header. This is just a u16, but
 /// it is wrapped in a struct for consistency with the other fields.
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 pub struct LengthWord([u8;2]);
 
 /// The sequence word is the third word of the primary header.
@@ -349,7 +352,7 @@ impl Arbitrary for LengthWord {
 /// The PrimaryHeader struct represents a CCSDS Primary header.
 /// Its representation in memory matches the CCSDS standard.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PrimaryHeader {
     pub control  : ControlWord,
     pub sequence : SequenceWord,
@@ -357,6 +360,17 @@ pub struct PrimaryHeader {
 }
 
 impl PrimaryHeader {
+    /// Create a new PrimaryHeader from raw bytes.
+    pub fn new(bytes: [u8;6]) -> PrimaryHeader {
+        let pri_header : PrimaryHeader;
+
+        unsafe {
+            pri_header = std::mem::transmute::<[u8;6], PrimaryHeader>(bytes);
+        }
+
+        return pri_header;
+    }
+
     /// Get the length of the packet in bytes, including the primary header.
     pub fn packet_length(&self) -> u16 {
         self.length.length_field() + CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES

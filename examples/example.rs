@@ -17,6 +17,10 @@ fn main() {
     unsafe {
         let pri_header = std::mem::transmute::<[u8;6], PrimaryHeader>(bytes);
 
+        let pri_header_new = PrimaryHeader::new(bytes);
+
+        assert!(pri_header == pri_header_new);
+
         // CCSDS version is currently always 0
         assert!(pri_header.control.version() == 0);
 

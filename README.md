@@ -34,6 +34,10 @@ extern crate ccsds_primary_header;
 use ccsds_primary_header::*;
 ```
 
+To create a PrimaryHeader, either transmute raw bytes to
+a PrimaryHeader struct, or use 'PrimaryHeader::new' to
+create a primary header from bytes.
+
 ## Notes
 This crate has not been used in production code. There is
 a comprehensive set of unit tests, but until it is used with
