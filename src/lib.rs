@@ -372,11 +372,15 @@ pub struct PrimaryHeader<E> {
 impl<E: ByteOrder> PrimaryHeader<E> {
     /// Create a new PrimaryHeader from raw bytes.
     pub fn new(bytes: [u8;6]) -> PrimaryHeader<E> {
-        let pri_header : PrimaryHeader<E>;
+        let mut pri_header : PrimaryHeader<E> = Default::default();
 
-        unsafe {
-            pri_header = std::mem::transmute::<[u8;6], PrimaryHeader<E>>(bytes);
-        }
+        // copy the array byte-for-byte into the primary header
+        pri_header.control.0[0]  = bytes[0];
+        pri_header.control.0[1]  = bytes[1];
+        pri_header.sequence.0[0] = bytes[2];
+        pri_header.sequence.0[1] = bytes[3];
+        pri_header.length.0[0]   = bytes[4];
+        pri_header.length.0[1]   = bytes[5];
 
         return pri_header;
     }
