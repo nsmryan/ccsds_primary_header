@@ -5,10 +5,14 @@ CCSDS Space Packet Protocol standards document.
 This packet header is used in space applications, including the International Space
 Station and many cubesat applications, among many other.
 
-The PrimaryHeader struct is defined in such a way that it is laid out in memory
+The CcsdsPrimaryHeader struct is defined in such a way that it is laid out in memory
 as defined by the standard, including bitfields and big endian byte order.
 To support this layout the fields are accessed through getters/setters rather
 then through direct access.
+
+The PrimaryHeader type is parameterized by either BigEndian or LittleEndian, This
+allows for CCSDS implementations that do not conform to the standard.
+
 
 Header fields that have enumerations are retrieved as enums.
 
@@ -18,14 +22,15 @@ created out of sequences of u8s, and by transmuting from raw memory as these str
 read memory directly in the CCSDS format.
 */
 extern crate byteorder;
+extern crate quickcheck;
+extern crate rand;
+
+
+use std::marker::PhantomData;
 
 use self::byteorder::{ByteOrder, BigEndian};
 
-extern crate quickcheck;
-
 use quickcheck::*;
-
-extern crate rand;
 
 use self::rand::{Rand};
 
@@ -234,54 +239,54 @@ impl From<SeqFlag> for u16 {
 /// * The packet's APID, indicating the packet's source,
 ///   destination, and contents.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
-pub struct ControlWord([u8;2]);
+pub struct ControlWord<E>([u8;2], PhantomData<E>);
 
-impl ControlWord {
+impl<E: ByteOrder + Send + 'static> ControlWord<E> {
     pub fn version(&self) -> u16 {
-        (BigEndian::read_u16(&self.0) & 0xE000) >> 13
+        (E::read_u16(&self.0) & 0xE000) >> 13
     }
 
     pub fn set_version(&mut self, version : u16) {
-        let word = (BigEndian::read_u16(&self.0) & 0x1FFF) | (version << 13);
+        let word = (E::read_u16(&self.0) & 0x1FFF) | (version << 13);
 
-        BigEndian::write_u16(&mut self.0, word);
+        E::write_u16(&mut self.0, word);
     }
 
     pub fn packet_type(&self) -> PacketType {
-        PacketType::from(((BigEndian::read_u16(&self.0) & 0x1000) >> 12) as u8)
+        PacketType::from(((E::read_u16(&self.0) & 0x1000) >> 12) as u8)
     }
     
     pub fn set_packet_type(&mut self, packet_type : PacketType) {
-        let word = (BigEndian::read_u16(&self.0) & 0xEFFF) | ((packet_type as u16) << 12);
+        let word = (E::read_u16(&self.0) & 0xEFFF) | ((packet_type as u16) << 12);
 
-        BigEndian::write_u16(&mut self.0, word);
+        E::write_u16(&mut self.0, word);
     }
 
     pub fn secondary_header_flag(&self) -> SecondaryHeaderFlag {
-        SecondaryHeaderFlag::from(((BigEndian::read_u16(&self.0) & 0x0800) >> 11) as u8)
+        SecondaryHeaderFlag::from(((E::read_u16(&self.0) & 0x0800) >> 11) as u8)
     }
     
     pub fn set_secondary_header_flag(&mut self, sec_header_flag : SecondaryHeaderFlag) {
-        let word = (BigEndian::read_u16(&self.0) & 0xF7FF) | ((sec_header_flag as u16) << 11);
+        let word = (E::read_u16(&self.0) & 0xF7FF) | ((sec_header_flag as u16) << 11);
 
-        BigEndian::write_u16(&mut self.0, word);
+        E::write_u16(&mut self.0, word);
     }
 
     pub fn apid(&self) -> u16 {
-        (BigEndian::read_u16(&self.0) & 0x07FF)
+        (E::read_u16(&self.0) & 0x07FF)
     }
     
     pub fn set_apid(&mut self, apid : u16) {
-        let word = (BigEndian::read_u16(&self.0) & 0xF800) | (apid & 0x07FF);
+        let word = (E::read_u16(&self.0) & 0xF800) | (apid & 0x07FF);
 
-        BigEndian::write_u16(&mut self.0, word);
+        E::write_u16(&mut self.0, word);
     }
 }
 
-impl Arbitrary for ControlWord {
+impl<E: Send + Clone + 'static> Arbitrary for ControlWord<E> {
     fn arbitrary<G : Gen>(g : &mut G) -> Self {
         let control_word = g.gen();
-        ControlWord( control_word )
+        ControlWord( control_word, PhantomData )
     }
 }
 
@@ -289,86 +294,101 @@ impl Arbitrary for ControlWord {
 /// It contains a sequence count and an enum that determines how
 /// to interpret the sequence count.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
-pub struct SequenceWord([u8;2]);
+pub struct SequenceWord<E>([u8;2], PhantomData<E>);
 
-impl SequenceWord {
+impl<E: ByteOrder> SequenceWord<E> {
     pub fn sequence_type(&self) -> SeqFlag {
-        SeqFlag::from((BigEndian::read_u16(&self.0) >> 14) as u8)
+        SeqFlag::from((E::read_u16(&self.0) >> 14) as u8)
     }
     
     pub fn set_sequence_type(&mut self, seq_flag : SeqFlag) {
-        let word = (BigEndian::read_u16(&self.0) & 0x3FFF) | (u16::from(seq_flag) << 14);
+        let word = (E::read_u16(&self.0) & 0x3FFF) | (u16::from(seq_flag) << 14);
 
-        BigEndian::write_u16(&mut self.0, word);
+        E::write_u16(&mut self.0, word);
     }
 
     pub fn sequence_count(&self) -> u16 {
-        BigEndian::read_u16(&self.0) & 0x3FFF
+        E::read_u16(&self.0) & 0x3FFF
     }
 
     pub fn set_sequence_count(&mut self, seq_count : u16) {
-        let word = (BigEndian::read_u16(&self.0) & 0xC000) | (seq_count & 0x3FFF);
+        let word = (E::read_u16(&self.0) & 0xC000) | (seq_count & 0x3FFF);
 
-        BigEndian::write_u16(&mut self.0, word);
+        E::write_u16(&mut self.0, word);
     }
 }
 
-impl Arbitrary for SequenceWord {
+impl<E: Send + Clone + 'static> Arbitrary for SequenceWord<E> {
     fn arbitrary<G : Gen>(g : &mut G) -> Self {
         let sequence_word = g.gen();
-        SequenceWord(sequence_word)
+        SequenceWord(sequence_word, PhantomData)
     }
 }
 
 /// The length word of the CCSDS header. This is just a u16, but
 /// it is wrapped in a struct for consistency with the other fields.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
-pub struct LengthWord([u8;2]);
+pub struct LengthWord<E>([u8;2], PhantomData<E>);
 
 /// The sequence word is the third word of the primary header.
-impl LengthWord {
+impl<E: ByteOrder> LengthWord<E> {
     pub fn length_field(&self) -> u16 {
-        BigEndian::read_u16(&self.0)
+        E::read_u16(&self.0)
     }
 
     pub fn set_length_field(&mut self, length : u16) {
-        BigEndian::write_u16(&mut self.0, length);
+        E::write_u16(&mut self.0, length);
     }
 }
 
-impl Rand for LengthWord {
+impl<E> Rand for LengthWord<E> {
     fn rand<R: Rng>(rng : &mut R) -> Self {
-        LengthWord(rng.gen())
+        LengthWord(rng.gen(), PhantomData)
     }
 }
 
-impl Arbitrary for LengthWord {
+impl<E: Clone + Send + 'static> Arbitrary for LengthWord<E> {
     fn arbitrary<G : Gen>(g : &mut G) -> Self {
         let len = g.gen();
-        LengthWord(len)
+        LengthWord(len, PhantomData)
     }
 }
+
+/// The CcsdsPrimaryHeader is a PrimaryHeader that is
+/// BigEndian.
+pub type CcsdsPrimaryHeader = PrimaryHeader<BigEndian>;
 
 /// The PrimaryHeader struct represents a CCSDS Primary header.
 /// Its representation in memory matches the CCSDS standard.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct PrimaryHeader {
-    pub control  : ControlWord,
-    pub sequence : SequenceWord,
-    pub length   : LengthWord
+pub struct PrimaryHeader<E> {
+    pub control:    ControlWord<E>,
+    pub sequence:   SequenceWord<E>,
+    pub length:     LengthWord<E>,
+    pub endianness: PhantomData<E>,
 }
 
-impl PrimaryHeader {
+impl<E: ByteOrder> PrimaryHeader<E> {
     /// Create a new PrimaryHeader from raw bytes.
-    pub fn new(bytes: [u8;6]) -> PrimaryHeader {
-        let pri_header : PrimaryHeader;
+    pub fn new(bytes: [u8;6]) -> PrimaryHeader<E> {
+        let pri_header : PrimaryHeader<E>;
 
         unsafe {
-            pri_header = std::mem::transmute::<[u8;6], PrimaryHeader>(bytes);
+            pri_header = std::mem::transmute::<[u8;6], PrimaryHeader<E>>(bytes);
         }
 
         return pri_header;
+    }
+
+    pub fn from_slice(bytes: &[u8]) -> Option<PrimaryHeader<E>> {
+        if bytes.len() >= CCSDS_PRI_HEADER_SIZE_BYTES as usize {
+            let mut header_bytes: [u8;6] = [0; 6];
+            header_bytes.copy_from_slice(&bytes[0..6]);
+            Some(PrimaryHeader::new(header_bytes))
+        } else {
+            None
+        }
     }
 
     /// Get the length of the packet in bytes, including the primary header.
@@ -378,16 +398,17 @@ impl PrimaryHeader {
 
     /// Set the length of the packet in bytes, including the primary header.
     pub fn set_packet_length(&mut self, packet_length : u16) {
-        BigEndian::write_u16(&mut self.length.0, packet_length);
+        E::write_u16(&mut self.length.0, packet_length);
     }
 }
 
-impl Arbitrary for PrimaryHeader {
+impl<E: ByteOrder + Send + 'static> Arbitrary for PrimaryHeader<E> {
     fn arbitrary<G : Gen>(g : &mut G) -> Self {
         PrimaryHeader {
-            control  : ControlWord(g.gen::<[u8;2]>()),
-            sequence : SequenceWord(g.gen::<[u8;2]>()),
-            length   : g.gen()
+            control:     ControlWord(g.gen::<[u8;2]>(), PhantomData),
+            sequence:    SequenceWord(g.gen::<[u8;2]>(), PhantomData),
+            length:      g.gen(),
+            endianness:  PhantomData,
         }
     }
 }
