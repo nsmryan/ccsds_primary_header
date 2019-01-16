@@ -1,9 +1,9 @@
 [package]
 name = "ccsds_primary_header"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["nsmryan <nsmryan@gmail.com>"]
 readme="README.md"
-keywords=["serde", "bytse", "parser", "ccsds"]
+keywords=["serde", "bytes", "parser", "ccsds"]
 categories=["parsing", "network-programming"]
 documentation="https://docs.rs/ccsds_primary_header"
 license="BSD-3-Clause"

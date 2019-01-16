@@ -31,7 +31,7 @@ format.
 To use this crate, add the following to your Cargo.toml
 ```toml
 [dependancies]
-ccsds_primary_header="0.4.0"
+ccsds_primary_header="0.5.0"
 ```
 
 Next add this to you crate:
@@ -41,8 +41,9 @@ use ccsds_primary_header::*;
 ```
 
 To create a CcsdsPrimaryHeader, either transmute raw bytes to
-a CcsdsPrimaryHeader struct, or use 'CcsdsPrimaryHeader::new' to
-create a primary header from bytes.
+a CcsdsPrimaryHeader struct, use 'CcsdsPrimaryHeader::new' to
+create a primary header from bytes, or us CcsdsPrimaryHeader::from\_slice
+to create a header from a slice.
 
 ## Notes
 This crate has not been used in production code. There is
