@@ -12,7 +12,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ccsds_header_alternating_ones() {
+    fn test_ccsds_header_alternating_ones() {
         let mut bytes : [u8;6] = Default::default();
         bytes[0] = 0x17;
         bytes[1] = 0xFF;
@@ -36,7 +36,7 @@ mod tests {
     }
 
     #[test]
-    fn ccsds_header_alternating_ones_alt() {
+    fn test_ccsds_header_alternating_ones_alt() {
         let mut bytes : [u8;6] = Default::default();
         bytes[0] = 0xE8;
         bytes[1] = 0x00;
@@ -60,12 +60,19 @@ mod tests {
     }
 
     #[test]
-    fn ccsds_header_size() {
+    fn test_ccsds_header_size() {
         assert!(std::mem::size_of::<CcsdsPrimaryHeader>() == CCSDS_PRI_HEADER_SIZE_BYTES as usize);
     }
 
+    #[test]
+    fn test_ccsds_header_from_slice() {
+        assert!(CcsdsPrimaryHeader::from_slice(&[0]) == None);
+        assert!(CcsdsPrimaryHeader::from_slice(&[0, 0, 0, 0, 0, 0]) == Some(Default::default()));
+        assert!(CcsdsPrimaryHeader::from_slice(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) == Some(Default::default()));
+    }
+
     quickcheck! {
-        fn ccsds_version_get_set(version : u16) -> bool {
+        fn test_ccsds_version_get_set(version : u16) -> bool {
             let version = version % 0x7;
 
             let mut pri_header : CcsdsPrimaryHeader = Default::default();
@@ -75,7 +82,7 @@ mod tests {
             pri_header.control.version() == version
         }
 
-        fn ccsds_packet_type_get_set(packet_type : PacketType) -> bool {
+        fn test_ccsds_packet_type_get_set(packet_type : PacketType) -> bool {
             let mut pri_header : CcsdsPrimaryHeader = Default::default();
 
             pri_header.control.set_packet_type(packet_type);
@@ -83,7 +90,7 @@ mod tests {
             pri_header.control.packet_type() == packet_type
         }
 
-        fn ccsds_sec_header_flag_get_set(sec_header_flag : SecondaryHeaderFlag) -> bool {
+        fn test_ccsds_sec_header_flag_get_set(sec_header_flag : SecondaryHeaderFlag) -> bool {
             let mut pri_header : CcsdsPrimaryHeader = Default::default();
 
             pri_header.control.set_secondary_header_flag(sec_header_flag);
@@ -91,7 +98,7 @@ mod tests {
             pri_header.control.secondary_header_flag() == sec_header_flag
         }
 
-        fn ccsds_apid_get_set(apid : u16) -> bool {
+        fn test_ccsds_apid_get_set(apid : u16) -> bool {
             let apid = apid % 0x7FF;
 
             let mut pri_header : CcsdsPrimaryHeader = Default::default();
@@ -101,7 +108,7 @@ mod tests {
             pri_header.control.apid() == apid
         }
 
-        fn ccsds_seq_flag_get_set(seq_flag : SeqFlag) -> bool {
+        fn test_ccsds_seq_flag_get_set(seq_flag : SeqFlag) -> bool {
             let mut pri_header : CcsdsPrimaryHeader = Default::default();
 
             pri_header.sequence.set_sequence_type(seq_flag);
@@ -109,7 +116,7 @@ mod tests {
             pri_header.sequence.sequence_type() == seq_flag
         }
 
-        fn ccsds_seq_count_get_set(seq_count : u16) -> bool {
+        fn test_ccsds_seq_count_get_set(seq_count : u16) -> bool {
             let seq_count = seq_count % 0x3FFF;
 
             let mut pri_header : CcsdsPrimaryHeader = Default::default();
@@ -119,7 +126,7 @@ mod tests {
             pri_header.sequence.sequence_count() == seq_count
         }
 
-        fn ccsds_length_get_set(length : u16) -> bool {
+        fn test_ccsds_length_get_set(length : u16) -> bool {
             let mut pri_header : CcsdsPrimaryHeader = Default::default();
 
             pri_header.length.set_length_field(length);

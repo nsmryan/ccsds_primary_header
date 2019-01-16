@@ -385,6 +385,8 @@ impl<E: ByteOrder> PrimaryHeader<E> {
         return pri_header;
     }
 
+    /// Create a PrimaryHeader from a slice. If the slice is not
+    /// long enough then None is returned.
     pub fn from_slice(bytes: &[u8]) -> Option<PrimaryHeader<E>> {
         if bytes.len() >= CCSDS_PRI_HEADER_SIZE_BYTES as usize {
             let mut header_bytes: [u8;6] = [0; 6];
