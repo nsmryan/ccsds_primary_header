@@ -31,7 +31,7 @@ format.
 To use this crate, add the following to your Cargo.toml
 ```toml
 [dependancies]
-ccsds_primary_header="0.5.0"
+ccsds_primary_header="0.6.0"
 ```
 
 Next add this to you crate:
