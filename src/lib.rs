@@ -42,16 +42,16 @@ pub const CCSDS_VERSION : u8 = 0;
 
 /// The CCSDS primary header size in bytes.
 #[allow(dead_code)]
-pub const CCSDS_PRI_HEADER_SIZE_BYTES : u16 = 6;
+pub const CCSDS_PRI_HEADER_SIZE_BYTES : u32 = 6;
 
 /// The minimum size of a CCSDS packet's data section.
 #[allow(dead_code)]
-pub const CCSDS_MIN_DATA_LENGTH_BYTES : u16 = 1;
+pub const CCSDS_MIN_DATA_LENGTH_BYTES : u32 = 1;
 
 /// The minimum packet length of a CCSDS packet.
 /// This is the primary header size plus 1 byte.
 #[allow(dead_code)]
-pub const CCSDS_MIN_LENGTH : u16 = CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES; // mem::size_of::<PrimaryHeader>() + 1;
+pub const CCSDS_MIN_LENGTH : u32 = CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES; // mem::size_of::<PrimaryHeader>() + 1;
 
 
 /// The PacketType indicates whether the packet is a command (Command) or a 
@@ -398,8 +398,17 @@ impl<E: ByteOrder> PrimaryHeader<E> {
     }
 
     /// Get the length of the packet in bytes, including the primary header.
-    pub fn packet_length(&self) -> u16 {
-        self.length.length_field() + CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES
+    /// The length is returned as a u32 because the CCSDS standard allows the total 
+    /// packet length to exceed 65535.
+    pub fn packet_length(&self) -> u32 {
+        self.length.length_field() as u32 + CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES
+    }
+
+    /// Get the length of the data section in bytes, not including the primary header.
+    /// The length is returned as a u32 because the CCSDS standard allows the total 
+    /// packet length to exceed 65535.
+    pub fn data_length(&self) -> u32 {
+        self.length.length_field() as u32 + CCSDS_MIN_DATA_LENGTH_BYTES
     }
 
     /// Set the length of the packet in bytes, including the primary header.
