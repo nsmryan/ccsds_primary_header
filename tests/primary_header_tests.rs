@@ -1,6 +1,7 @@
 extern crate ccsds_primary_header;
 
 use ccsds_primary_header::*;
+use ccsds_primary_header::primary_header::*;
 
 #[cfg(test)]
 #[macro_use]

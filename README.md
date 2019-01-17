@@ -13,6 +13,10 @@ information in most applications.
 This crate provides a simple implementation of the
 primary header. It is intended to be used as a building
 block for larger definitions or packet processing tools.
+There is also a mechanism to parse CCSDS packets from a byte
+stream, allowing for a variety of checks that can be configured
+for a particular project's expectations.
+
 
 The CcsdsPrimaryHeader struct provided by the crate has the
 advantage that its in-memory representation matches the
@@ -28,22 +32,38 @@ format.
 
 
 ## Usage
+
+### Primary Header
 To use this crate, add the following to your Cargo.toml
 ```toml
 [dependancies]
-ccsds_primary_header="0.6.0"
+ccsds_primary_header="0.7.0"
 ```
 
 Next add this to you crate:
 ```rust
 extern crate ccsds_primary_header;
-use ccsds_primary_header::*;
+use ccsds_primary_header::primary_header::*;
 ```
 
-To create a CcsdsPrimaryHeader, either transmute raw bytes to
-a CcsdsPrimaryHeader struct, use 'CcsdsPrimaryHeader::new' to
-create a primary header from bytes, or us CcsdsPrimaryHeader::from\_slice
-to create a header from a slice.
+### Primary Header Parser
+This crate also contains a mechanism for parsing CCSDS packets. This
+is exposed in the parser module, which provides the CcsdsParser struct.
+This struct can be given bytes of data, such as from a packet stream, and
+will find valid CCSDS packets within this stream.
+
+
+Include the parser with the following 'use' statement:
+```rust
+extern crate ccsds_primary_header;
+use ccsds_primary_header::parser::*;
+```
+
+The parser can be configured to only allow certain APIDs, to expect
+a secondary header flag, to use a maximum length for packets, and to
+use a custom validation function that might be project-specific during
+parsing.
+
 
 ## Notes
 This crate has not been used in production code. There is

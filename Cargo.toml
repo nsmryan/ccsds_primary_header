@@ -1,6 +1,6 @@
 [package]
 name = "ccsds_primary_header"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["nsmryan <nsmryan@gmail.com>"]
 readme="README.md"
 keywords=["serde", "bytes", "parser", "ccsds"]
@@ -14,4 +14,5 @@ description="Implementation of the CCSDS Primary Header for space applications"
 byteorder="1.2.6"
 quickcheck = "0.6"
 rand = "0.4.2"
+bytes = "0.4"
 
