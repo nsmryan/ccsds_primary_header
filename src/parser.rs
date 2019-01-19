@@ -9,6 +9,15 @@ pub struct CcsdsParser {
     pub max_packet_length: Option<u32>,
     pub secondary_header_required: bool,
     pub validation_callback: Option<Box<Fn (&BytesMut) -> bool>>,
+
+    pub sync_bytes: Vec<u8>,
+    pub keep_sync: bool,
+
+    pub num_header_bytes: u32,
+    pub keep_header: bool,
+
+    pub num_footer_bytes: u32,
+    pub keep_footer: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -21,6 +30,7 @@ pub enum CcsdsParserStatus {
     ValidationFailed,
     ApidNotAllowed,
     ValidPacket,
+    SyncNotFound,
 }
 
 impl CcsdsParser {
@@ -31,6 +41,12 @@ impl CcsdsParser {
             max_packet_length: None,
             secondary_header_required: false,
             validation_callback: None,
+            sync_bytes: Vec::new(),
+            keep_sync: false,
+            num_header_bytes: 0,
+            keep_header: false,
+            num_footer_bytes: 0,
+            keep_footer: false,
         }
     }
 
@@ -57,11 +73,18 @@ impl CcsdsParser {
     }
 
     pub fn current_header(&self) -> Option<CcsdsPrimaryHeader> {
-        if self.bytes.len() < CCSDS_MIN_LENGTH as usize {
+        let min_length = CCSDS_MIN_LENGTH      +
+                         self.num_header_bytes +
+                         self.num_footer_bytes +
+                         self.sync_bytes.len() as u32;
+
+        if self.bytes.len() < min_length as usize {
             None
         } else {
+            let start_of_header = self.num_header_bytes as usize + self.sync_bytes.len();
+            let end_of_header = start_of_header + CCSDS_PRI_HEADER_SIZE_BYTES as usize;
             let mut header_bytes:[u8; 6] = [0; 6];
-            header_bytes.clone_from_slice(&self.bytes[0..CCSDS_PRI_HEADER_SIZE_BYTES as usize]);
+            header_bytes.clone_from_slice(&self.bytes[start_of_header..end_of_header]);
             Some(CcsdsPrimaryHeader::from_slice(&header_bytes).unwrap())
         }
     }
@@ -72,6 +95,10 @@ impl CcsdsParser {
         match self.current_header() {
             Some(header) => pri_header = header,
             None => return CcsdsParserStatus::NotEnoughBytesForHeader,
+        }
+
+        if !self.sync_bytes.iter().zip(self.bytes.iter()).map(|(b0, b1)| *b0 == *b1).all(|b| b == true) {
+            return CcsdsParserStatus::SyncNotFound;
         }
 
         // a packet length that exceeds the maximum is not a valid packet
@@ -144,7 +171,19 @@ impl CcsdsParser {
             parser_status = self.current_status();
         }
 
-        let packet_length = self.current_header().unwrap().packet_length();
+        let mut packet_length = self.current_header().unwrap().packet_length();
+        if self.keep_sync {
+            packet_length += self.sync_bytes.len() as u32;
+        }
+
+        if self.keep_header {
+            packet_length += self.num_header_bytes;
+        }
+
+        if self.keep_footer {
+            packet_length += self.num_footer_bytes;
+        }
+
         return Some(self.bytes.split_to(packet_length as usize));
     }
 }

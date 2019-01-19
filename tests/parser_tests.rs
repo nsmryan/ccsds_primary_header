@@ -1,4 +1,7 @@
+extern crate bytes;
 extern crate ccsds_primary_header;
+
+use bytes::BytesMut;
 
 use ccsds_primary_header::primary_header::*;
 use ccsds_primary_header::parser::*;
@@ -102,3 +105,81 @@ fn test_ccsds_parser_validation_pass() {
     parser.validation_callback = Some(Box::new(|_| true));
     assert!(parser.current_status() == CcsdsParserStatus::ValidPacket);
 }
+
+#[test]
+fn test_ccsds_parser_sync() {
+    let mut parser = CcsdsParser::new();
+    parser.sync_bytes.push(0xEB);
+    parser.sync_bytes.push(0x90);
+    parser.recv_slice(&[0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF, 0x00, 0x00]);
+    assert!(parser.current_status() == CcsdsParserStatus::SyncNotFound);
+
+    parser.bytes.clear();
+    parser.recv_slice(&[0xEB, 0x90, 0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF]);
+    assert!(parser.current_status() == CcsdsParserStatus::ValidPacket);
+}
+
+#[test]
+fn test_ccsds_parser_find_sync() {
+    let mut parser = CcsdsParser::new();
+    parser.sync_bytes.push(0xEB);
+    parser.sync_bytes.push(0x90);
+    parser.recv_slice(&[0x00, 0x01, 0xEB, 0x90, 0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF, 0x00, 0x00]);
+    assert!(parser.current_status() == CcsdsParserStatus::SyncNotFound);
+    let packet = parser.pull_packet();
+    assert!(packet != None);
+    assert!(packet.unwrap().len() == 8);
+}
+
+#[test]
+fn test_ccsds_parser_keep_header() {
+    let mut parser = CcsdsParser::new();
+    parser.sync_bytes.push(0xEB);
+    parser.sync_bytes.push(0x90);
+    parser.num_header_bytes = 2;
+    parser.keep_header = true;
+    parser.recv_slice(&[0xEB, 0x90, 0x00, 0x01, 0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF, 0x00, 0x00]);
+    assert!(parser.current_status() == CcsdsParserStatus::ValidPacket);
+    let packet = parser.pull_packet();
+    assert!(packet != None);
+    println!("len = {}", packet.clone().unwrap().len());
+    assert!(packet.unwrap().len() == 10)
+}
+
+#[test]
+fn test_ccsds_parser_keep_header_and_sync() {
+    let mut parser = CcsdsParser::new();
+    parser.sync_bytes.push(0xEB);
+    parser.sync_bytes.push(0x90);
+    parser.keep_sync = true;
+
+    parser.num_header_bytes = 2;
+    parser.keep_header = true;
+
+    parser.recv_slice(&[0xEB, 0x90, 0x00, 0x01, 0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF, 0x00, 0x00]);
+    assert!(parser.current_status() == CcsdsParserStatus::ValidPacket);
+    let packet = parser.pull_packet();
+    assert!(packet != None);
+    println!("len = {}", packet.clone().unwrap().len());
+    assert!(packet.unwrap().len() == 12)
+}
+
+#[test]
+fn test_ccsds_parser_keep_footer() {
+    let slice = [0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF, 0x12, 0x34];
+    let mut parser = CcsdsParser::new();
+    parser.keep_footer = true;
+    parser.num_footer_bytes = 2;
+
+    parser.recv_slice(&slice);
+    assert!(parser.current_status() == CcsdsParserStatus::ValidPacket);
+    let packet = parser.pull_packet();
+    assert!(packet != None);
+    let num_bytes = packet.clone().unwrap().len();
+    assert!(num_bytes == 10);
+
+    let mut bytes = BytesMut::new();
+    bytes.extend_from_slice(&slice);
+    assert!(packet.unwrap() == bytes);
+}
+
