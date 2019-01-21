@@ -183,3 +183,22 @@ fn test_ccsds_parser_keep_footer() {
     assert!(packet.unwrap() == bytes);
 }
 
+#[test]
+fn test_ccsds_parser_iterator() {
+    let slice = [0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF];
+    let mut parser = CcsdsParser::new();
+
+    let n = 100;
+
+    for _ in 0..n {
+        parser.recv_slice(&slice);
+    }
+
+    for _ in 0..n {
+        let packet = parser.next();
+        assert!(packet != None);
+        let mut bytes = BytesMut::new();
+        bytes.extend_from_slice(&slice);
+        assert!(packet.unwrap() == bytes);
+    }
+}
