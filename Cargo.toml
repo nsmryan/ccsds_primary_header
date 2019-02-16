@@ -1,6 +1,6 @@
 [package]
 name = "ccsds_primary_header"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["nsmryan <nsmryan@gmail.com>"]
 readme="README.md"
 keywords=["serde", "bytes", "parser", "ccsds"]

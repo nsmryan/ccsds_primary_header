@@ -167,6 +167,15 @@ impl CcsdsParser {
         }
     }
 
+    /// Create a new parser with the given configuration options.
+    pub fn with_config(config: CcsdsParserConfig) -> Self {
+        CcsdsParser {
+            bytes: BytesMut::new(),
+            config: config,
+            reached_end: false,
+        }
+    }
+
     /// Allow a particular APID. If the allowed_apids field is None, it is
     /// turned into a Vec with a single element.
     pub fn allow_apid(&mut self, apid: u16) {
