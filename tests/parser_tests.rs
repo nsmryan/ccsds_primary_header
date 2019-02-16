@@ -89,24 +89,6 @@ fn test_ccsds_parser_sec_header_invalid() {
 }
 
 #[test]
-fn test_ccsds_parser_validation_fail() {
-    let mut parser = CcsdsParser::new();
-    parser.recv_slice(&[0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF]);
-
-    parser.config.validation_callback = Some(Box::new(|_| false));
-    assert!(parser.current_status() == CcsdsParserStatus::ValidationFailed);
-}
-
-#[test]
-fn test_ccsds_parser_validation_pass() {
-    let mut parser = CcsdsParser::new();
-    parser.recv_slice(&[0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF]);
-
-    parser.config.validation_callback = Some(Box::new(|_| true));
-    assert!(parser.current_status() == CcsdsParserStatus::ValidPacket);
-}
-
-#[test]
 fn test_ccsds_parser_sync() {
     let mut parser = CcsdsParser::new();
     parser.config.sync_bytes.push(0xEB);

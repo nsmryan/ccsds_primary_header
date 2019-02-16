@@ -15,60 +15,15 @@ pub enum CcsdsParserStatus {
     NotEnoughBytesPacketLength,
     InvalidCcsdsVersion,
     SecondaryHeaderInvalid,
-    ValidationFailed,
     ApidNotAllowed,
     ValidPacket,
     SyncNotFound,
 }
 
-impl CcsdsParserConfig {
-    pub fn new() -> CcsdsParserConfig {
-        CcsdsParserConfig {
-            allowed_apids: None,
-            max_packet_length: None,
-            secondary_header_required: false,
-            validation_callback: None,
-            sync_bytes: Vec::new(),
-            keep_sync: false,
-            num_header_bytes: 0,
-            keep_header: false,
-            num_footer_bytes: 0,
-            keep_footer: false,
-        }
-    }
-}
-
-/// A CcsdsParser is a configuration and a byte buffer which can be queried
-/// for CCSDS packets. The parser is created and configured, and then can be
-/// fed bytes. At any time it can be queried for packets, which will be
-/// provided as a BytesMut without copying.
-///
-/// The parser will return a CcsdsParserStatus describing the current packet-
-/// indicating whether there are enough bytes, and if so whether the packet
-/// passes the configured conditions for validaity.
-///
-/// Some conditions cannot be hardcoded in a library and are project specific,
-/// so a validation functon (validation_callback) can be provided to perform
-/// project-specific checks such as a checksum or CRC of the packet.
-pub struct CcsdsParser {
-    /// A byte buffer to pull packets from. This can be fed more bytes with
-    /// recv_bytes or recv_slice.
-    pub bytes: BytesMut,
-
-    /// The config field provides configuration for how to read out Ccsds packets,
-    /// such as which APIDs are allowed or whether there is a header or footer on 
-    /// each packet. See CcsdsParserConfig for details.
-    pub config: CcsdsParserConfig,
-
-    /// This private field is used when running the parser as an iterator. This allows
-    /// the parser to know if it is being called after apparently running out of bytes.
-    reached_end: bool,
-}
-
-
 /// The CcsdsParserConfig struct provides all configuration used by a CcsdsParser.
 /// This is broken out into a seprate structure to be read in, serialized, and otherwise
 /// manipulated independantly of a particular CcsdsParser.
+#[derive(Debug, PartialEq, Clone)]
 pub struct CcsdsParserConfig {
     /// The allowed APIDs list is either None, meaning any APID is valid,
     /// or a Vec of allowed APIDs.
@@ -88,13 +43,6 @@ pub struct CcsdsParserConfig {
     /// case, this flag can be set to indicate that a properly formatted packet
     /// must have this flag set.
     pub secondary_header_required: bool,
-
-    /// The validation callback is a user-provided function that can
-    /// validate a packet in a project-specific way. This could include
-    /// a checksum or CRC, or any other check required.
-    /// Note that the function is provided the packet from the start,
-    /// including a sync and header if they are configured.
-    pub validation_callback: Option<Box<Fn (&BytesMut) -> bool>>,
 
     /// The sync bytes are a Vec of bytes that must proceed a packet for
     /// it to be valid. This is useful when there is a sync marker before each 
@@ -122,6 +70,47 @@ pub struct CcsdsParserConfig {
     /// called when pull_packet is called, or left behind.
     pub keep_footer: bool,
 }
+
+impl CcsdsParserConfig {
+    pub fn new() -> CcsdsParserConfig {
+        CcsdsParserConfig {
+            allowed_apids: None,
+            max_packet_length: None,
+            secondary_header_required: false,
+            sync_bytes: Vec::new(),
+            keep_sync: false,
+            num_header_bytes: 0,
+            keep_header: false,
+            num_footer_bytes: 0,
+            keep_footer: false,
+        }
+    }
+}
+
+
+/// A CcsdsParser is a configuration and a byte buffer which can be queried
+/// for CCSDS packets. The parser is created and configured, and then can be
+/// fed bytes. At any time it can be queried for packets, which will be
+/// provided as a BytesMut without copying.
+///
+/// The parser will return a CcsdsParserStatus describing the current packet-
+/// indicating whether there are enough bytes, and if so whether the packet
+/// passes the configured conditions for validaity.
+pub struct CcsdsParser {
+    /// A byte buffer to pull packets from. This can be fed more bytes with
+    /// recv_bytes or recv_slice.
+    pub bytes: BytesMut,
+
+    /// The config field provides configuration for how to read out Ccsds packets,
+    /// such as which APIDs are allowed or whether there is a header or footer on 
+    /// each packet. See CcsdsParserConfig for details.
+    pub config: CcsdsParserConfig,
+
+    /// This private field is used when running the parser as an iterator. This allows
+    /// the parser to know if it is being called after apparently running out of bytes.
+    reached_end: bool,
+}
+
 
 /// The iterator for CcsdsParser produces CCSDS packets in turn. When it returned
 /// None, then the buffer has no vaild packets.
@@ -264,16 +253,6 @@ impl CcsdsParser {
         if self.config.secondary_header_required &&
             pri_header.control.secondary_header_flag() == SecondaryHeaderFlag::NotPresent {
             return CcsdsParserStatus::SecondaryHeaderInvalid;
-        }
-
-        match self.config.validation_callback {
-            Some(ref valid) => {
-                if !valid(&self.bytes) {
-                    return CcsdsParserStatus::ValidationFailed;
-                }
-            },
-
-            _ => {},
         }
 
         // check if the APID is allowed
