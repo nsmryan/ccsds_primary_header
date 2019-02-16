@@ -69,9 +69,9 @@ from the parser.
 
 
 ## Notes
-This crate has not been used in production code. There is
-a comprehensive set of unit tests, but until it is used with
-real CCSDS packets I do not recommend relying on it.
+There is a comprehensive set of unit tests, and I have tested it with CCSDS packets when
+developing the [CCSDS Router tool](https://github.com/nsmryan/CCSDS-Router).
+However, I have not used it in a production environment yet.
 
 ## License
 This project is licensed until the BSD-3-Clause license.

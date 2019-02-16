@@ -5,6 +5,39 @@ use bytes::{Bytes, BytesMut};
 use primary_header::*;
 
 
+/// A CcsdsParserStatus is the current state of a CcsdsParser. The parser can determine
+/// whether a packet is valid, have enough bytes, or is otherwise invalid. The 
+/// only enum value that indicates a valid packet is ValidPacket.
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum CcsdsParserStatus {
+    NotEnoughBytesForHeader,
+    ExceedsMaxPacketLength,
+    NotEnoughBytesPacketLength,
+    InvalidCcsdsVersion,
+    SecondaryHeaderInvalid,
+    ValidationFailed,
+    ApidNotAllowed,
+    ValidPacket,
+    SyncNotFound,
+}
+
+impl CcsdsParserConfig {
+    fn new() -> CcsdsParserConfig {
+        CcsdsParserConfig {
+            allowed_apids: None,
+            max_packet_length: None,
+            secondary_header_required: false,
+            validation_callback: None,
+            sync_bytes: Vec::new(),
+            keep_sync: false,
+            num_header_bytes: 0,
+            keep_header: false,
+            num_footer_bytes: 0,
+            keep_footer: false,
+        }
+    }
+}
+
 /// A CcsdsParser is a configuration and a byte buffer which can be queried
 /// for CCSDS packets. The parser is created and configured, and then can be
 /// fed bytes. At any time it can be queried for packets, which will be
@@ -22,6 +55,21 @@ pub struct CcsdsParser {
     /// recv_bytes or recv_slice.
     pub bytes: BytesMut,
 
+    /// The config field provides configuration for how to read out Ccsds packets,
+    /// such as which APIDs are allowed or whether there is a header or footer on 
+    /// each packet. See CcsdsParserConfig for details.
+    pub config: CcsdsParserConfig,
+
+    /// This private field is used when running the parser as an iterator. This allows
+    /// the parser to know if it is being called after apparently running out of bytes.
+    reached_end: bool,
+}
+
+
+/// The CcsdsParserConfig struct provides all configuration used by a CcsdsParser.
+/// This is broken out into a seprate structure to be read in, serialized, and otherwise
+/// manipulated independantly of a particular CcsdsParser.
+pub struct CcsdsParserConfig {
     /// The allowed APIDs list is either None, meaning any APID is valid,
     /// or a Vec of allowed APIDs.
     /// Note that if an APId is not in the allowed APID list, the packet
@@ -73,26 +121,6 @@ pub struct CcsdsParser {
     /// The keep footer flag is used to determine if sync bytes are passed along to the
     /// called when pull_packet is called, or left behind.
     pub keep_footer: bool,
-
-    /// This private field is used when running the parser as an iterator. This allows
-    /// the parser to know if it is being called after apparently running out of bytes.
-    reached_end: bool,
-}
-
-/// A CcsdsParserStatus is the current state of a CcsdsParser. The parser can determine
-/// whether a packet is valid, have enough bytes, or is otherwise invalid. The 
-/// only enum value that indicates a valid packet is ValidPacket.
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum CcsdsParserStatus {
-    NotEnoughBytesForHeader,
-    ExceedsMaxPacketLength,
-    NotEnoughBytesPacketLength,
-    InvalidCcsdsVersion,
-    SecondaryHeaderInvalid,
-    ValidationFailed,
-    ApidNotAllowed,
-    ValidPacket,
-    SyncNotFound,
 }
 
 /// The iterator for CcsdsParser produces CCSDS packets in turn. When it returned
@@ -134,16 +162,7 @@ impl CcsdsParser {
     pub fn new() -> Self {
         CcsdsParser {
             bytes: BytesMut::new(),
-            allowed_apids: None,
-            max_packet_length: None,
-            secondary_header_required: false,
-            validation_callback: None,
-            sync_bytes: Vec::new(),
-            keep_sync: false,
-            num_header_bytes: 0,
-            keep_header: false,
-            num_footer_bytes: 0,
-            keep_footer: false,
+            config: CcsdsParserConfig::new(),
             reached_end: false,
         }
     }
@@ -151,11 +170,11 @@ impl CcsdsParser {
     /// Allow a particular APID. If the allowed_apids field is None, it is
     /// turned into a Vec with a single element.
     pub fn allow_apid(&mut self, apid: u16) {
-        match self.allowed_apids {
+        match self.config.allowed_apids {
             None => {
                 let mut apids = Vec::new();
                 apids.push(apid);
-                self.allowed_apids = Some(apids);
+                self.config.allowed_apids = Some(apids);
             },
 
             Some(ref mut apids) => {
@@ -183,14 +202,14 @@ impl CcsdsParser {
     /// if one is available.
     pub fn current_header(&self) -> Option<CcsdsPrimaryHeader> {
         let min_length = CCSDS_MIN_LENGTH      +
-                         self.num_header_bytes +
-                         self.num_footer_bytes +
-                         self.sync_bytes.len() as u32;
+                         self.config.num_header_bytes +
+                         self.config.num_footer_bytes +
+                         self.config.sync_bytes.len() as u32;
 
         if self.bytes.len() < min_length as usize {
             None
         } else {
-            let start_of_header = self.num_header_bytes as usize + self.sync_bytes.len();
+            let start_of_header = self.config.num_header_bytes as usize + self.config.sync_bytes.len();
             let end_of_header = start_of_header + CCSDS_PRI_HEADER_SIZE_BYTES as usize;
             let mut header_bytes:[u8; 6] = [0; 6];
             header_bytes.clone_from_slice(&self.bytes[start_of_header..end_of_header]);
@@ -207,12 +226,12 @@ impl CcsdsParser {
             None => return CcsdsParserStatus::NotEnoughBytesForHeader,
         }
 
-        if !self.sync_bytes.iter().zip(self.bytes.iter()).map(|(b0, b1)| *b0 == *b1).all(|b| b == true) {
+        if !self.config.sync_bytes.iter().zip(self.bytes.iter()).map(|(b0, b1)| *b0 == *b1).all(|b| b == true) {
             return CcsdsParserStatus::SyncNotFound;
         }
 
         // a packet length that exceeds the maximum is not a valid packet
-        match self.max_packet_length {
+        match self.config.max_packet_length {
             Some(max_length) => {
                 if pri_header.packet_length() > max_length {
                     return CcsdsParserStatus::ExceedsMaxPacketLength;
@@ -233,12 +252,12 @@ impl CcsdsParser {
 
         // if the secondary header flag is required, but not present, assume that the
         // packet is malformed.
-        if self.secondary_header_required &&
+        if self.config.secondary_header_required &&
             pri_header.control.secondary_header_flag() == SecondaryHeaderFlag::NotPresent {
             return CcsdsParserStatus::SecondaryHeaderInvalid;
         }
 
-        match self.validation_callback {
+        match self.config.validation_callback {
             Some(ref valid) => {
                 if !valid(&self.bytes) {
                     return CcsdsParserStatus::ValidationFailed;
@@ -249,7 +268,7 @@ impl CcsdsParser {
         }
 
         // check if the APID is allowed
-        match self.allowed_apids {
+        match self.config.allowed_apids {
             Some(ref apid_list) => {
                 if !apid_list.contains(&pri_header.control.apid()) {
                     // enough bytes, APID not allowed
@@ -291,16 +310,16 @@ impl CcsdsParser {
         }
 
         let mut packet_length = self.current_header().unwrap().packet_length();
-        if self.keep_sync {
-            packet_length += self.sync_bytes.len() as u32;
+        if self.config.keep_sync {
+            packet_length += self.config.sync_bytes.len() as u32;
         }
 
-        if self.keep_header {
-            packet_length += self.num_header_bytes;
+        if self.config.keep_header {
+            packet_length += self.config.num_header_bytes;
         }
 
-        if self.keep_footer {
-            packet_length += self.num_footer_bytes;
+        if self.config.keep_footer {
+            packet_length += self.config.num_footer_bytes;
         }
 
         return Some(self.bytes.split_to(packet_length as usize));
