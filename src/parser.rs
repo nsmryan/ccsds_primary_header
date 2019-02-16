@@ -22,7 +22,7 @@ pub enum CcsdsParserStatus {
 }
 
 impl CcsdsParserConfig {
-    fn new() -> CcsdsParserConfig {
+    pub fn new() -> CcsdsParserConfig {
         CcsdsParserConfig {
             allowed_apids: None,
             max_packet_length: None,
