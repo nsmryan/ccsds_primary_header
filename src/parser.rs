@@ -106,6 +106,11 @@ pub struct CcsdsParser {
     /// each packet. See CcsdsParserConfig for details.
     pub config: CcsdsParserConfig,
 
+    /// This is the number of bytes that have been dropped while parsing CCSDS packets.
+    /// If a header cannot be found, then the parser will attempt to move past regions
+    /// of invalid data.
+    pub skipped_bytes: usize,
+
     /// This private field is used when running the parser as an iterator. This allows
     /// the parser to know if it is being called after apparently running out of bytes.
     reached_end: bool,
@@ -133,6 +138,8 @@ impl Iterator for CcsdsParser {
                 if !self.reached_end {
                     if self.current_status() != CcsdsParserStatus::NotEnoughBytesForHeader {
                         self.bytes.advance(1);
+                        self.skipped_bytes += 1;
+
                         self.pull_packet()
                     } else {
                         self.reached_end = true;
@@ -152,6 +159,7 @@ impl CcsdsParser {
         CcsdsParser {
             bytes: BytesMut::new(),
             config: CcsdsParserConfig::new(),
+            skipped_bytes: 0,
             reached_end: false,
         }
     }
@@ -161,6 +169,7 @@ impl CcsdsParser {
         CcsdsParser {
             bytes: BytesMut::new(),
             config: config,
+            skipped_bytes: 0,
             reached_end: false,
         }
     }
@@ -292,7 +301,11 @@ impl CcsdsParser {
                    return None;
             }
 
+            // otherwise, advance 1 byte and try to validate the header again,
+            // assuming that we are in a region of invalid data and need to resync
+            // with the CCSDS header.
             self.bytes.advance(1);
+            self.skipped_bytes += 1;
 
             parser_status = self.current_status();
         }

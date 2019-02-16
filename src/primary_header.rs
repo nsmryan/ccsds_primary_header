@@ -26,6 +26,11 @@ pub const CCSDS_MIN_DATA_LENGTH_BYTES : u32 = 1;
 #[allow(dead_code)]
 pub const CCSDS_MIN_LENGTH : u32 = CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES; // mem::size_of::<PrimaryHeader>() + 1;
 
+/// The maximum packet length of a CCSDS packet.
+/// This indicates a length field of 0xFFFF, plus a primary header, plus one byte.
+#[allow(dead_code)]
+pub const CCSDS_MAX_LENGTH : u32 = CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES + 0xFFFF;
+
 
 /// The PacketType indicates whether the packet is a command (Command) or a 
 /// telemetry (Data) packet.
