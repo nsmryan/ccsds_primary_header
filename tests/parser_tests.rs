@@ -89,6 +89,21 @@ fn test_ccsds_parser_sec_header_invalid() {
 }
 
 #[test]
+fn test_ccsds_parser_valid_ccsds() {
+    let mut parser = CcsdsParser::new();
+    parser.recv_slice(&[0x00,0x3,0xFF,0xFF,0x00,0x01,0xFF,0xFF, 0x00, 0x00]);
+    assert!(parser.current_status() == CcsdsParserStatus::ValidPacket);
+}
+
+#[test]
+fn test_ccsds_parser_valid_ccsds_little_endian() {
+    let mut parser = CcsdsParser::new();
+    parser.config.little_endian_header = true;
+    parser.recv_slice(&[0x03,0x00,0xFF,0xFF,0x01,0x00,0xFF,0xFF, 0x00, 0x00]);
+    assert!(parser.current_status() == CcsdsParserStatus::ValidPacket);
+}
+
+#[test]
 fn test_ccsds_parser_sync() {
     let mut parser = CcsdsParser::new();
     parser.config.sync_bytes.push(0xEB);

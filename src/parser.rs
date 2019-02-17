@@ -69,6 +69,10 @@ pub struct CcsdsParserConfig {
     /// The keep footer flag is used to determine if sync bytes are passed along to the
     /// called when pull_packet is called, or left behind.
     pub keep_footer: bool,
+
+    /// The CCSDS header is big endian in the standard, but allow little endian headers
+    /// to be parsed.
+    pub little_endian_header: bool,
 }
 
 impl CcsdsParserConfig {
@@ -83,6 +87,7 @@ impl CcsdsParserConfig {
             keep_header: false,
             num_footer_bytes: 0,
             keep_footer: false,
+            little_endian_header: false,
         }
     }
 }
@@ -219,8 +224,13 @@ impl CcsdsParser {
             let start_of_header = self.config.num_header_bytes as usize + self.config.sync_bytes.len();
             let end_of_header = start_of_header + CCSDS_PRI_HEADER_SIZE_BYTES as usize;
             let mut header_bytes:[u8; 6] = [0; 6];
+
             header_bytes.clone_from_slice(&self.bytes[start_of_header..end_of_header]);
-            Some(CcsdsPrimaryHeader::from_slice(&header_bytes).unwrap())
+            if self.config.little_endian_header {
+                Some(PrimaryHeader::from_slice(&header_bytes).unwrap().to_big_endian())
+            } else {
+                Some(CcsdsPrimaryHeader::from_slice(&header_bytes).unwrap())
+            }
         }
     }
 

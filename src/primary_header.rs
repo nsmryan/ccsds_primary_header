@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use byteorder::{ByteOrder, BigEndian};
+use byteorder::{ByteOrder, LittleEndian, BigEndian};
 
 use quickcheck::*;
 
@@ -390,6 +390,21 @@ impl<E: ByteOrder> PrimaryHeader<E> {
     /// Set the length of the packet in bytes, including the primary header.
     pub fn set_packet_length(&mut self, packet_length : u16) {
         E::write_u16(&mut self.length.0, packet_length);
+    }
+}
+
+impl PrimaryHeader<LittleEndian> {
+    pub fn to_big_endian(&self) -> CcsdsPrimaryHeader {
+        let mut big_header: CcsdsPrimaryHeader = Default::default();
+
+        big_header.control.0[0] = self.control.0[1];
+        big_header.control.0[1] = self.control.0[0];
+        big_header.sequence.0[0] = self.sequence.0[1];
+        big_header.sequence.0[1] = self.sequence.0[0];
+        big_header.length.0[0] = self.length.0[1];
+        big_header.length.0[1] = self.length.0[0];
+
+        big_header
     }
 }
 
