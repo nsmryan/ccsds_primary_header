@@ -221,7 +221,7 @@ impl CcsdsParser {
         if self.bytes.len() < min_length as usize {
             None
         } else {
-            let start_of_header = self.config.num_header_bytes as usize + self.config.sync_bytes.len();
+            let start_of_header = self.config.sync_bytes.len() + self.config.num_header_bytes as usize;
             let end_of_header = start_of_header + CCSDS_PRI_HEADER_SIZE_BYTES as usize;
             let mut header_bytes:[u8; 6] = [0; 6];
 
@@ -238,27 +238,29 @@ impl CcsdsParser {
     pub fn current_status(&self) -> CcsdsParserStatus {
         let pri_header;
 
-        match self.current_header() {
-            Some(header) => pri_header = header,
-            None => return CcsdsParserStatus::NotEnoughBytesForHeader,
+        // if there is a header available, retrieve it.
+        // otherwise, return indicating that we need more data to have a valid header.
+        if let Some(header) = self.current_header() {
+            pri_header = header;
+        } else {
+            return CcsdsParserStatus::NotEnoughBytesForHeader;
         }
 
-        if !self.config.sync_bytes.iter().zip(self.bytes.iter()).map(|(b0, b1)| *b0 == *b1).all(|b| b == true) {
-            return CcsdsParserStatus::SyncNotFound;
+        // check that, if there is a sync in front of the packet, that the data matches the sync
+        if self.config.sync_bytes.len() > 0 {
+            if !self.config.sync_bytes.iter().zip(self.bytes.iter()).all(|(b0, b1)| *b0 == *b1) {
+                return CcsdsParserStatus::SyncNotFound;
+            }
         }
 
         // a packet length that exceeds the maximum is not a valid packet
-        match self.config.max_packet_length {
-            Some(max_length) => {
-                if pri_header.packet_length() > max_length {
-                    return CcsdsParserStatus::ExceedsMaxPacketLength;
-                }
-            },
-
-            _ => { },
+        if let Some(max_length) = self.config.max_packet_length {
+            if pri_header.packet_length() > max_length {
+                return CcsdsParserStatus::ExceedsMaxPacketLength;
+            }
         }
 
-        if self.bytes.len() < pri_header.packet_length() as usize {
+        if self.bytes.len() < self.full_packet_length() {
             return CcsdsParserStatus::NotEnoughBytesPacketLength;
         }
 
@@ -275,16 +277,12 @@ impl CcsdsParser {
         }
 
         // check if the APID is allowed
-        match self.config.allowed_apids {
-            Some(ref apid_list) => {
-                if !apid_list.contains(&pri_header.control.apid()) {
-                    // enough bytes, APID not allowed
-                    //self.bytes.advance(pri_header.packet_length() as usize);
-                    return CcsdsParserStatus::ApidNotAllowed;
-                }
-            },
-
-            _ => {},
+        if let Some(ref apid_list) = self.config.allowed_apids {
+            if !apid_list.contains(&pri_header.control.apid()) {
+                // enough bytes, APID not allowed
+                //self.bytes.advance(pri_header.packet_length() as usize);
+                return CcsdsParserStatus::ApidNotAllowed;
+            }
         }
 
         CcsdsParserStatus::ValidPacket
@@ -320,6 +318,14 @@ impl CcsdsParser {
             parser_status = self.current_status();
         }
 
+        let packet_length = self.full_packet_length();
+
+        return Some(self.bytes.split_to(packet_length as usize));
+    }
+
+    pub fn full_packet_length(&self) -> usize {
+        // NOTE this use of unwrap is not really necessary- there should be
+        // some refactoring that removes the need for it.
         let mut packet_length = self.current_header().unwrap().packet_length();
         if self.config.keep_sync {
             packet_length += self.config.sync_bytes.len() as u32;
@@ -333,7 +339,7 @@ impl CcsdsParser {
             packet_length += self.config.num_footer_bytes;
         }
 
-        return Some(self.bytes.split_to(packet_length as usize));
+        return packet_length as usize;
     }
 }
 
