@@ -318,26 +318,46 @@ impl CcsdsParser {
             parser_status = self.current_status();
         }
 
-        let packet_length = self.full_packet_length();
+        // Determine packet length, advancing past header portions if they will
+        // not be returned
+        let mut packet_length = self.current_header().unwrap().packet_length();
+        if self.config.keep_sync {
+            packet_length += self.config.sync_bytes.len() as u32;
+        } else {
+            self.bytes.advance(self.config.sync_bytes.len());
+        }
 
-        return Some(self.bytes.split_to(packet_length as usize));
+        if self.config.keep_header {
+            packet_length += self.config.num_header_bytes;
+        } else {
+            self.bytes.advance(self.config.num_header_bytes as usize);
+        }
+
+        // the footer length is included if it is going to stay in the packet.
+        // otherwise it is dropped after retrieving the packet data.
+        if self.config.keep_footer {
+            packet_length += self.config.num_footer_bytes;
+        }
+
+        let packet = self.bytes.split_to(packet_length as usize);
+
+        // if not keeping the footer, advance past the footer once the packet
+        // data is retrieved (above)
+        if !self.config.keep_footer {
+            self.bytes.advance(self.config.num_footer_bytes as usize);
+        }
+
+        return Some(packet);
     }
 
     pub fn full_packet_length(&self) -> usize {
         // NOTE this use of unwrap is not really necessary- there should be
         // some refactoring that removes the need for it.
         let mut packet_length = self.current_header().unwrap().packet_length();
-        if self.config.keep_sync {
-            packet_length += self.config.sync_bytes.len() as u32;
-        }
 
-        if self.config.keep_header {
-            packet_length += self.config.num_header_bytes;
-        }
-
-        if self.config.keep_footer {
-            packet_length += self.config.num_footer_bytes;
-        }
+        packet_length += self.config.sync_bytes.len() as u32;
+        packet_length += self.config.num_header_bytes;
+        packet_length += self.config.num_footer_bytes;
 
         return packet_length as usize;
     }
