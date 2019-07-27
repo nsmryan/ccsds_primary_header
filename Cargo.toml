@@ -1,6 +1,6 @@
 [package]
 name = "ccsds_primary_header"
-version = "0.10.2"
+version = "0.10.3"
 authors = ["nsmryan <nsmryan@gmail.com>"]
 readme="README.md"
 keywords=["serde", "bytes", "parser", "ccsds"]
@@ -9,6 +9,7 @@ documentation="https://docs.rs/ccsds_primary_header"
 license="BSD-3-Clause"
 homepage="https://github.com/nsmryan/ccsds_primary_header"
 description="Implementation of the CCSDS Primary Header for space applications"
+repository="https://github.com/nsmryan/ccsds_primary_header"
 
 [dependencies]
 byteorder="1.2.6"
