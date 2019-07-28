@@ -288,6 +288,16 @@ impl CcsdsParser {
         CcsdsParserStatus::ValidPacket
     }
 
+    /// The reject function tells the parser that the current position does not contain a packet.
+    /// This is used internally in the parser, but is also exposed in case the calling code
+    /// inspects a packet retrieved with pull_packet and finds that it is invalid.
+    /// There can be additional checks on CCSDS packets, such as checksums or CRCs, which are not
+    /// handled by this crate, so reject is necessary feedback into the parser for these cases.
+    pub fn reject(&mut self) {
+        self.bytes.advance(1);
+        self.skipped_bytes += 1;
+    }
+
     /// The pull_packet function retrieves the next packet from the parser,
     /// or returns None if there are no valid packets. This advances the byte buffer
     /// to the next packet. If the current buffer may or may not be a valid packet, but
@@ -312,8 +322,7 @@ impl CcsdsParser {
             // otherwise, advance 1 byte and try to validate the header again,
             // assuming that we are in a region of invalid data and need to resync
             // with the CCSDS header.
-            self.bytes.advance(1);
-            self.skipped_bytes += 1;
+            self.reject();
 
             parser_status = self.current_status();
         }
@@ -350,7 +359,7 @@ impl CcsdsParser {
         return Some(packet);
     }
 
-    pub fn full_packet_length(&self) -> usize {
+    fn full_packet_length(&self) -> usize {
         // NOTE this use of unwrap is not really necessary- there should be
         // some refactoring that removes the need for it.
         let mut packet_length = self.current_header().unwrap().packet_length();
