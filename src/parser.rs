@@ -10,13 +10,23 @@ use primary_header::*;
 /// only enum value that indicates a valid packet is ValidPacket.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum CcsdsParserStatus {
-    NotEnoughBytesForHeader,
-    ExceedsMaxPacketLength,
-    NotEnoughBytesPacketLength,
-    InvalidCcsdsVersion,
-    SecondaryHeaderInvalid,
-    ApidNotAllowed,
+    /// The packet is valid
     ValidPacket,
+    /// Buffer does not contain enough bytes to hold a CCSDS header
+    NotEnoughBytesForHeader,
+    /// The packet length field was greater than the maximum configured length
+    ExceedsMaxPacketLength,
+    /// The packet length field was smaller than the minimum configured length
+    BelowMinPacketLength,
+    /// The buffer does not contain enough data for the packet length report in the header
+    NotEnoughBytesPacketLength,
+    /// The CCSDS version field was not 0
+    InvalidCcsdsVersion,
+    /// The secondary header flag was not set, when configured as a required field
+    SecondaryHeaderInvalid,
+    /// The APID was not in the list of allowed APIDs
+    ApidNotAllowed,
+    /// The sync was not found, for packets where a sync has been configured
     SyncNotFound,
 }
 
@@ -37,6 +47,12 @@ pub struct CcsdsParserConfig {
     /// If a packet's length exceeds this amount, then it is considered improperly
     /// formatted.
     pub max_packet_length: Option<u32>,
+
+    /// The min packet length is either None, meaning any packet length is valid,
+    /// or a given number of bytes. This applies to the CCSDS packet length.
+    /// If a packet's length is below this amount, then it is considered improperly
+    /// formatted.
+    pub min_packet_length: Option<u32>,
 
     /// The secondary header bit may or may not be set in a particular CCSDS 
     /// packet. For some projects, all packets have a secondary header. In this
@@ -80,6 +96,7 @@ impl CcsdsParserConfig {
         CcsdsParserConfig {
             allowed_apids: None,
             max_packet_length: None,
+            min_packet_length: None,
             secondary_header_required: false,
             sync_bytes: Vec::new(),
             keep_sync: false,
@@ -257,6 +274,13 @@ impl CcsdsParser {
         if let Some(max_length) = self.config.max_packet_length {
             if pri_header.packet_length() > max_length {
                 return CcsdsParserStatus::ExceedsMaxPacketLength;
+            }
+        }
+
+        // a packet length that is smaller than the minimum length is not a valid packet
+        if let Some(min_length) = self.config.min_packet_length {
+            if pri_header.packet_length() < min_length {
+                return CcsdsParserStatus::BelowMinPacketLength;
             }
         }
 

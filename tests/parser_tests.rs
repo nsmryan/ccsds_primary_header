@@ -46,6 +46,16 @@ fn test_ccsds_parser_max_length() {
 }
 
 #[test]
+fn test_ccsds_parser_min_length() {
+    let mut parser = CcsdsParser::new();
+    parser.config.min_packet_length = Some(11);
+    parser.recv_slice(&[0x1F,0xFF,0xFF,0xFF,0x00,3,0xFF, 0xFF, 0xFF, 0xFF]);
+
+    assert_eq!(parser.current_status(), CcsdsParserStatus::BelowMinPacketLength);
+    assert_eq!(parser.pull_packet(), None);
+}
+
+#[test]
 fn test_ccsds_parser_packet_length_too_large() {
     let mut parser = CcsdsParser::new();
     parser.recv_slice(&[0x1F,0xFF,0xFF,0xFF,0x03,0x00,0xFF,0xFF]);
