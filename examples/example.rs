@@ -15,9 +15,9 @@ fn main() {
              bytes[3], bytes[4], bytes[5]);
     
     unsafe {
-        let pri_header = std::mem::transmute::<[u8;6], CcsdsPrimaryHeader>(bytes);
+        let pri_header = std::mem::transmute::<[u8;6], PrimaryHeader>(bytes);
 
-        let pri_header_new = CcsdsPrimaryHeader::new(bytes);
+        let pri_header_new = PrimaryHeader::new(bytes);
 
         assert!(pri_header == pri_header_new);
 
@@ -50,7 +50,7 @@ fn main() {
     // We can also lay down a packet header with field setters.
     // We will build up the same packet that we have above, but using PrimaryHeader
     // rather then laying out the bytes in a [u8;6];
-    let mut pri_header : CcsdsPrimaryHeader = Default::default();
+    let mut pri_header : PrimaryHeader = Default::default();
 
     pri_header.control.set_version(0);
     pri_header.control.set_packet_type(PacketType::Command);
@@ -65,7 +65,7 @@ fn main() {
     pri_header.length.set_length_field(3);
     
     unsafe {
-        let bytes : [u8;6] = std::mem::transmute::<CcsdsPrimaryHeader, [u8;6]>(pri_header);
+        let bytes : [u8;6] = std::mem::transmute::<PrimaryHeader, [u8;6]>(pri_header);
         println!("ending bytes   {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}",
                  bytes[0], bytes[1], bytes[2],
                  bytes[3], bytes[4], bytes[5]);

@@ -237,7 +237,7 @@ impl CcsdsParser {
 
     /// The current header function extracts the primary header from a parser
     /// if one is available.
-    pub fn current_header(&self) -> Option<CcsdsPrimaryHeader> {
+    pub fn current_header(&self) -> Option<PrimaryHeader> {
         let min_length = CCSDS_MIN_LENGTH      +
                          self.config.num_header_bytes +
                          self.config.num_footer_bytes +
@@ -252,9 +252,9 @@ impl CcsdsParser {
 
             header_bytes.clone_from_slice(&self.bytes[start_of_header..end_of_header]);
             if self.config.little_endian_header {
-                Some(PrimaryHeader::from_slice(&header_bytes).unwrap().to_big_endian())
+                Some(PrimaryHeader::from_slice(&header_bytes).unwrap())
             } else {
-                Some(CcsdsPrimaryHeader::from_slice(&header_bytes).unwrap())
+                Some(PrimaryHeader::from_slice(&header_bytes).unwrap())
             }
         }
     }
