@@ -37,7 +37,7 @@ format.
 To use this crate, add the following to your Cargo.toml
 ```toml
 [dependancies]
-ccsds_primary_header="0.8.0"
+ccsds_primary_header="0.13.0"
 ```
 
 Next add this to you crate:
@@ -74,5 +74,4 @@ developing the [CCSDS Router tool](https://github.com/nsmryan/CCSDS-Router).
 However, I have not used it in a production environment yet.
 
 ## License
-This project is licensed until the BSD-3-Clause license.
-
+This project is licensed under either MIT or APACHE2, whichever you prefer.

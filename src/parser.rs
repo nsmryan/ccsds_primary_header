@@ -1,5 +1,3 @@
-use std::iter::Iterator;
-
 use bytes::{Bytes, BytesMut};
 
 use primary_header::*;
@@ -12,20 +10,28 @@ use primary_header::*;
 pub enum CcsdsParserStatus {
     /// The packet is valid
     ValidPacket,
+
     /// Buffer does not contain enough bytes to hold a CCSDS header
     NotEnoughBytesForHeader,
+
     /// The packet length field was greater than the maximum configured length
     ExceedsMaxPacketLength,
+
     /// The packet length field was smaller than the minimum configured length
     BelowMinPacketLength,
+
     /// The buffer does not contain enough data for the packet length report in the header
     NotEnoughBytesPacketLength,
+
     /// The CCSDS version field was not 0
     InvalidCcsdsVersion,
+
     /// The secondary header flag was not set, when configured as a required field
     SecondaryHeaderInvalid,
+
     /// The APID was not in the list of allowed APIDs
     ApidNotAllowed,
+
     /// The sync was not found, for packets where a sync has been configured
     SyncNotFound,
 }
@@ -147,6 +153,7 @@ pub struct CcsdsParser {
 /// then the buffer will be advanced by a byte. This allows
 /// the packet processing to continue, assuming that we may then be able to look past the garbage
 /// and find another packet.
+/*
 impl Iterator for CcsdsParser {
     type Item = BytesMut;
 
@@ -174,6 +181,7 @@ impl Iterator for CcsdsParser {
         }
     }
 }
+*/
 
 impl CcsdsParser {
     /// Create a new parser with default configuration options.
@@ -393,6 +401,30 @@ impl CcsdsParser {
         packet_length += self.config.num_footer_bytes;
 
         return packet_length as usize;
+    }
+
+    pub fn next(&mut self) -> Option<BytesMut> {
+        match self.pull_packet() {
+            Some(bytes) => {
+                Some(bytes)
+            },
+
+            None => {
+                if !self.reached_end {
+                    if self.current_status() != CcsdsParserStatus::NotEnoughBytesForHeader {
+                        self.bytes.advance(1);
+                        self.skipped_bytes += 1;
+
+                        self.pull_packet()
+                    } else {
+                        self.reached_end = true;
+                        None
+                    }
+                } else {
+                    None
+                }
+            },
+        }
     }
 }
 

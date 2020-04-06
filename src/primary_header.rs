@@ -2,34 +2,28 @@ use std::marker::PhantomData;
 
 use byteorder::{ByteOrder, LittleEndian, BigEndian};
 
-use quickcheck::*;
-
-use rand::{Rand};
-
-use rand::seq::{sample_iter};
-
 
 /// The CCSDS Version (always 0 currently).
 #[allow(dead_code)]
-pub const CCSDS_VERSION : u8 = 0;
+pub const CCSDS_VERSION: u8 = 0;
 
 /// The CCSDS primary header size in bytes.
 #[allow(dead_code)]
-pub const CCSDS_PRI_HEADER_SIZE_BYTES : u32 = 6;
+pub const CCSDS_PRI_HEADER_SIZE_BYTES: u32 = 6;
 
 /// The minimum size of a CCSDS packet's data section.
 #[allow(dead_code)]
-pub const CCSDS_MIN_DATA_LENGTH_BYTES : u32 = 1;
+pub const CCSDS_MIN_DATA_LENGTH_BYTES: u32 = 1;
 
 /// The minimum packet length of a CCSDS packet.
 /// This is the primary header size plus 1 byte.
 #[allow(dead_code)]
-pub const CCSDS_MIN_LENGTH : u32 = CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES; // mem::size_of::<PrimaryHeader>() + 1;
+pub const CCSDS_MIN_LENGTH: u32 = CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES; // mem::size_of::<PrimaryHeader>() + 1;
 
 /// The maximum packet length of a CCSDS packet.
 /// This indicates a length field of 0xFFFF, plus a primary header, plus one byte.
 #[allow(dead_code)]
-pub const CCSDS_MAX_LENGTH : u32 = CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES + 0xFFFF;
+pub const CCSDS_MAX_LENGTH: u32 = CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES + 0xFFFF;
 
 
 /// The PacketType indicates whether the packet is a command (Command) or a 
@@ -45,20 +39,6 @@ pub enum PacketType {
   Unknown
 } 
 
-impl Rand for PacketType {
-    fn rand<R: Rng>(rng : &mut R) -> Self {
-        use self::PacketType::*;
-        *sample_iter(rng, [Data, Command].iter(), 1).unwrap()[0]
-    }
-}
-
-impl Arbitrary for PacketType {
-    fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        let packet_type : u8 = g.gen();
-        PacketType::from(packet_type & 0x01)
-    }
-}
-
 impl Default for PacketType {
     fn default() -> PacketType {
         PacketType::Data
@@ -66,7 +46,7 @@ impl Default for PacketType {
 }
 
 impl From<u8> for PacketType {
-    fn from(byte : u8) -> PacketType {
+    fn from(byte: u8) -> PacketType {
         match byte {
             0 => PacketType::Data,
             1 => PacketType::Command,
@@ -76,7 +56,7 @@ impl From<u8> for PacketType {
 }
 
 impl From<PacketType> for u8 {
-    fn from(packet_type : PacketType) -> u8 {
+    fn from(packet_type: PacketType) -> u8 {
         match packet_type { 
             PacketType::Data    => 0,
             PacketType::Command => 1,
@@ -100,19 +80,6 @@ pub enum SecondaryHeaderFlag {
   Unknown
 } 
 
-impl Rand for SecondaryHeaderFlag {
-    fn rand<R: Rng>(rng : &mut R) -> Self {
-        *sample_iter(rng, [SecondaryHeaderFlag::NotPresent, SecondaryHeaderFlag::Present].iter(), 1).unwrap()[0]
-    }
-}
-
-impl Arbitrary for SecondaryHeaderFlag {
-    fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        let seq_header_flag : u8 = g.gen();
-        SecondaryHeaderFlag::from(seq_header_flag & 0x01)
-    }
-}
-
 impl Default for SecondaryHeaderFlag {
     fn default() -> SecondaryHeaderFlag {
         SecondaryHeaderFlag::NotPresent
@@ -120,7 +87,7 @@ impl Default for SecondaryHeaderFlag {
 }
 
 impl From<u8> for SecondaryHeaderFlag {
-    fn from(byte : u8) -> SecondaryHeaderFlag {
+    fn from(byte: u8) -> SecondaryHeaderFlag {
         match byte {
             0 => SecondaryHeaderFlag::NotPresent,
             1 => SecondaryHeaderFlag::Present,
@@ -130,7 +97,7 @@ impl From<u8> for SecondaryHeaderFlag {
 }
 
 impl From<SecondaryHeaderFlag> for u8 {
-    fn from(flag : SecondaryHeaderFlag) -> u8 {
+    fn from(flag: SecondaryHeaderFlag) -> u8 {
         match flag {
             SecondaryHeaderFlag::NotPresent => 0,
             SecondaryHeaderFlag::Present    => 1,
@@ -162,19 +129,6 @@ pub enum SeqFlag {
   Unknown
 }
 
-impl Rand for SeqFlag {
-    fn rand<R: Rng>(rng : &mut R) -> Self {
-        *sample_iter(rng, [SeqFlag::Continuation, SeqFlag::FirstSegment, SeqFlag::LastSegment, SeqFlag::Unsegmented].iter(), 1).unwrap()[0]
-    }
-}
-
-impl Arbitrary for SeqFlag {
-    fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        let seq_flag : u8 = g.gen();
-        SeqFlag::from(seq_flag % 0x03)
-    }
-}
-
 impl Default for SeqFlag {
     fn default() -> SeqFlag {
         SeqFlag::Unsegmented
@@ -182,7 +136,7 @@ impl Default for SeqFlag {
 }
 
 impl From<u8> for SeqFlag {
-    fn from(byte : u8) -> SeqFlag {
+    fn from(byte: u8) -> SeqFlag {
         match byte {
             0 => SeqFlag::Continuation,
             1 => SeqFlag::FirstSegment,
@@ -194,7 +148,7 @@ impl From<u8> for SeqFlag {
 }
 
 impl From<SeqFlag> for u16 {
-    fn from(byte : SeqFlag) -> u16 {
+    fn from(byte: SeqFlag) -> u16 {
         match byte {
             SeqFlag::Continuation => 0,
             SeqFlag::FirstSegment => 1,
@@ -215,54 +169,47 @@ impl From<SeqFlag> for u16 {
 /// * The packet's APID, indicating the packet's source,
 ///   destination, and contents.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
-pub struct ControlWord<E>([u8;2], PhantomData<E>);
+pub struct ControlWord<E>(pub [u8;2], pub PhantomData<E>);
 
 impl<E: ByteOrder + Send + 'static> ControlWord<E> {
     pub fn version(&self) -> u16 {
-        (E::read_u16(&self.0) & 0xE000) >> 13
+        return (E::read_u16(&self.0) & 0xE000) >> 13;
     }
 
-    pub fn set_version(&mut self, version : u16) {
+    pub fn set_version(&mut self, version: u16) {
         let word = (E::read_u16(&self.0) & 0x1FFF) | (version << 13);
 
         E::write_u16(&mut self.0, word);
     }
 
     pub fn packet_type(&self) -> PacketType {
-        PacketType::from(((E::read_u16(&self.0) & 0x1000) >> 12) as u8)
+        return PacketType::from(((E::read_u16(&self.0) & 0x1000) >> 12) as u8);
     }
     
-    pub fn set_packet_type(&mut self, packet_type : PacketType) {
+    pub fn set_packet_type(&mut self, packet_type: PacketType) {
         let word = (E::read_u16(&self.0) & 0xEFFF) | ((packet_type as u16) << 12);
 
         E::write_u16(&mut self.0, word);
     }
 
     pub fn secondary_header_flag(&self) -> SecondaryHeaderFlag {
-        SecondaryHeaderFlag::from(((E::read_u16(&self.0) & 0x0800) >> 11) as u8)
+        return SecondaryHeaderFlag::from(((E::read_u16(&self.0) & 0x0800) >> 11) as u8);
     }
     
-    pub fn set_secondary_header_flag(&mut self, sec_header_flag : SecondaryHeaderFlag) {
+    pub fn set_secondary_header_flag(&mut self, sec_header_flag: SecondaryHeaderFlag) {
         let word = (E::read_u16(&self.0) & 0xF7FF) | ((sec_header_flag as u16) << 11);
 
         E::write_u16(&mut self.0, word);
     }
 
     pub fn apid(&self) -> u16 {
-        (E::read_u16(&self.0) & 0x07FF)
+        return E::read_u16(&self.0) & 0x07FF;
     }
     
-    pub fn set_apid(&mut self, apid : u16) {
+    pub fn set_apid(&mut self, apid: u16) {
         let word = (E::read_u16(&self.0) & 0xF800) | (apid & 0x07FF);
 
         E::write_u16(&mut self.0, word);
-    }
-}
-
-impl<E: Send + Clone + 'static> Arbitrary for ControlWord<E> {
-    fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        let control_word = g.gen();
-        ControlWord( control_word, PhantomData )
     }
 }
 
@@ -270,14 +217,14 @@ impl<E: Send + Clone + 'static> Arbitrary for ControlWord<E> {
 /// It contains a sequence count and an enum that determines how
 /// to interpret the sequence count.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
-pub struct SequenceWord<E>([u8;2], PhantomData<E>);
+pub struct SequenceWord<E>(pub [u8;2], pub PhantomData<E>);
 
 impl<E: ByteOrder> SequenceWord<E> {
     pub fn sequence_type(&self) -> SeqFlag {
         SeqFlag::from((E::read_u16(&self.0) >> 14) as u8)
     }
     
-    pub fn set_sequence_type(&mut self, seq_flag : SeqFlag) {
+    pub fn set_sequence_type(&mut self, seq_flag: SeqFlag) {
         let word = (E::read_u16(&self.0) & 0x3FFF) | (u16::from(seq_flag) << 14);
 
         E::write_u16(&mut self.0, word);
@@ -287,46 +234,26 @@ impl<E: ByteOrder> SequenceWord<E> {
         E::read_u16(&self.0) & 0x3FFF
     }
 
-    pub fn set_sequence_count(&mut self, seq_count : u16) {
+    pub fn set_sequence_count(&mut self, seq_count: u16) {
         let word = (E::read_u16(&self.0) & 0xC000) | (seq_count & 0x3FFF);
 
         E::write_u16(&mut self.0, word);
     }
 }
 
-impl<E: Send + Clone + 'static> Arbitrary for SequenceWord<E> {
-    fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        let sequence_word = g.gen();
-        SequenceWord(sequence_word, PhantomData)
-    }
-}
-
 /// The length word of the CCSDS header. This is just a u16, but
 /// it is wrapped in a struct for consistency with the other fields.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
-pub struct LengthWord<E>([u8;2], PhantomData<E>);
+pub struct LengthWord<E>(pub [u8;2], pub PhantomData<E>);
 
 /// The sequence word is the third word of the primary header.
 impl<E: ByteOrder> LengthWord<E> {
     pub fn length_field(&self) -> u16 {
-        E::read_u16(&self.0)
+        return E::read_u16(&self.0);
     }
 
-    pub fn set_length_field(&mut self, length : u16) {
+    pub fn set_length_field(&mut self, length: u16) {
         E::write_u16(&mut self.0, length);
-    }
-}
-
-impl<E> Rand for LengthWord<E> {
-    fn rand<R: Rng>(rng : &mut R) -> Self {
-        LengthWord(rng.gen(), PhantomData)
-    }
-}
-
-impl<E: Clone + Send + 'static> Arbitrary for LengthWord<E> {
-    fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        let len = g.gen();
-        LengthWord(len, PhantomData)
     }
 }
 
@@ -348,7 +275,7 @@ pub struct PrimaryHeader<E> {
 impl<E: ByteOrder> PrimaryHeader<E> {
     /// Create a new PrimaryHeader from raw bytes.
     pub fn new(bytes: [u8;6]) -> PrimaryHeader<E> {
-        let mut pri_header : PrimaryHeader<E> = Default::default();
+        let mut pri_header: PrimaryHeader<E> = Default::default();
 
         // copy the array byte-for-byte into the primary header
         pri_header.control.0[0]  = bytes[0];
@@ -367,9 +294,9 @@ impl<E: ByteOrder> PrimaryHeader<E> {
         if bytes.len() >= CCSDS_PRI_HEADER_SIZE_BYTES as usize {
             let mut header_bytes: [u8;6] = [0; 6];
             header_bytes.copy_from_slice(&bytes[0..6]);
-            Some(PrimaryHeader::new(header_bytes))
+            return Some(PrimaryHeader::new(header_bytes));
         } else {
-            None
+            return None;
         }
     }
 
@@ -377,18 +304,18 @@ impl<E: ByteOrder> PrimaryHeader<E> {
     /// The length is returned as a u32 because the CCSDS standard allows the total 
     /// packet length to exceed 65535.
     pub fn packet_length(&self) -> u32 {
-        self.length.length_field() as u32 + CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES
+        return self.length.length_field() as u32 + CCSDS_PRI_HEADER_SIZE_BYTES + CCSDS_MIN_DATA_LENGTH_BYTES;
     }
 
     /// Get the length of the data section in bytes, not including the primary header.
     /// The length is returned as a u32 because the CCSDS standard allows the total 
     /// packet length to exceed 65535.
     pub fn data_length(&self) -> u32 {
-        self.length.length_field() as u32 + CCSDS_MIN_DATA_LENGTH_BYTES
+        return self.length.length_field() as u32 + CCSDS_MIN_DATA_LENGTH_BYTES;
     }
 
     /// Set the length of the packet in bytes, including the primary header.
-    pub fn set_packet_length(&mut self, packet_length : u16) {
+    pub fn set_packet_length(&mut self, packet_length: u16) {
         E::write_u16(&mut self.length.0, packet_length);
     }
 }
@@ -404,17 +331,7 @@ impl PrimaryHeader<LittleEndian> {
         big_header.length.0[0] = self.length.0[1];
         big_header.length.0[1] = self.length.0[0];
 
-        big_header
+        return big_header;
     }
 }
 
-impl<E: ByteOrder + Send + 'static> Arbitrary for PrimaryHeader<E> {
-    fn arbitrary<G : Gen>(g : &mut G) -> Self {
-        PrimaryHeader {
-            control:     ControlWord(g.gen::<[u8;2]>(), PhantomData),
-            sequence:    SequenceWord(g.gen::<[u8;2]>(), PhantomData),
-            length:      g.gen(),
-            endianness:  PhantomData,
-        }
-    }
-}

@@ -22,10 +22,15 @@ created out of sequences of u8s, and by transmuting from raw memory as these str
 read memory directly in the CCSDS format.
 */
 extern crate byteorder;
-extern crate quickcheck;
-extern crate rand;
+
 extern crate bytes;
 
+#[cfg(test)]
+extern crate rand;
+
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
 
 pub mod primary_header;
 pub mod parser;
