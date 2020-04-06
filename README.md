@@ -18,17 +18,11 @@ stream, allowing for a variety of checks that can be configured
 for a particular project's expectations.
 
 
-The CcsdsPrimaryHeader struct provided by the crate has the
+The PrimaryHeader struct provided by the crate has the
 advantage that its in-memory representation matches the
 CCSDS standard. It can be cast to a from a 
 byte array, sent over a wire, or used to serialize or
 deserialize CCSDS packets.
-
-This crate also provides a PrimaryHeader struct that
-is parameterized by either BigEndian or LittleEndian from
-byteorder crate. This allows for headers which do not conform
-to the CCSDS standard by laying out words in little endian
-format.
 
 
 ## Usage
@@ -37,7 +31,7 @@ format.
 To use this crate, add the following to your Cargo.toml
 ```toml
 [dependancies]
-ccsds_primary_header="0.14.0"
+ccsds_primary_header="0.15.0"
 ```
 
 Next add this to you crate:
